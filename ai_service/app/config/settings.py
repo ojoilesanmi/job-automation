@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     # Rate limiting
     RATE_LIMIT_PER_MINUTE: int = 60
 
+    # CORS
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:3001"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [o.strip() for o in self.CORS_ALLOWED_ORIGINS.split(",") if o.strip()]
+
     class Config:
         env_file = ".env"
         case_sensitive = True
