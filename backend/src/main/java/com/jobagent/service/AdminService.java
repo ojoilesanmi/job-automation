@@ -2,6 +2,7 @@ package com.jobagent.service;
 
 import com.jobagent.dto.*;
 import com.jobagent.exception.ResourceNotFoundException;
+import com.jobagent.model.AuditLog;
 import com.jobagent.model.JobSource;
 import com.jobagent.model.Permission;
 import com.jobagent.model.Role;
@@ -24,6 +25,7 @@ public class AdminService {
     private final PermissionRepository permissionRepository;
     private final UserRepository userRepository;
     private final JobSourceRepository jobSourceRepository;
+    private final AuditLogRepository auditLogRepository;
 
     // Roles
     @Transactional(readOnly = true)
@@ -207,6 +209,28 @@ public class AdminService {
         return new JobSourceResponse(
                 source.getId(), source.getName(), source.getSourceType(),
                 source.getBaseUrl(), source.getEnabled(), source.getConfigJson(), source.getCreatedAt()
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public AuditLogListResponse getAuditLogs(int page, int size) {
+        Page<AuditLog> logs = auditLogRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
+        List<AuditLogResponse> logList = logs.getContent().stream()
+                .map(this::toAuditLogResponse)
+                .collect(Collectors.toList());
+        return new AuditLogListResponse(logList, logs.getTotalElements(), logs.getTotalPages(), logs.getNumber());
+    }
+
+    private AuditLogResponse toAuditLogResponse(AuditLog log) {
+        return new AuditLogResponse(
+                log.getId(),
+                log.getUser() != null ? log.getUser().getId() : null,
+                log.getUser() != null ? log.getUser().getEmail() : null,
+                log.getAction(),
+                log.getEntityType(),
+                log.getEntityId(),
+                log.getMetadata(),
+                log.getCreatedAt()
         );
     }
 }

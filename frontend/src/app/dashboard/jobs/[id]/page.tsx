@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { parseSkills } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +26,8 @@ interface Job {
   relocationAvailable: boolean;
   visaSponsorshipSignal: boolean;
   seniority: string;
-  requiredSkills: string[];
-  preferredSkills: string[];
+  requiredSkills: string;
+  preferredSkills: string;
   experienceYears: number;
   employmentType: string;
   applicationUrl: string;
@@ -112,18 +113,18 @@ export default function JobDetailPage() {
           <Card>
             <CardHeader><CardTitle>Required skills</CardTitle></CardHeader>
             <CardContent className="flex flex-wrap gap-2">
-              {job.requiredSkills?.map((s) => (
+              {parseSkills(job.requiredSkills).map((s) => (
                 <Badge key={s} variant="outline">{s}</Badge>
               ))}
-              {(!job.requiredSkills || job.requiredSkills.length === 0) && <p className="text-sm text-muted-foreground">No skills extracted</p>}
+              {parseSkills(job.requiredSkills).length === 0 && <p className="text-sm text-muted-foreground">No skills extracted</p>}
             </CardContent>
           </Card>
 
-          {job.preferredSkills && job.preferredSkills.length > 0 && (
+          {parseSkills(job.preferredSkills).length > 0 && (
             <Card>
               <CardHeader><CardTitle>Preferred skills</CardTitle></CardHeader>
               <CardContent className="flex flex-wrap gap-2">
-                {job.preferredSkills.map((s) => (
+                {parseSkills(job.preferredSkills).map((s) => (
                   <Badge key={s} variant="outline">{s}</Badge>
                 ))}
               </CardContent>

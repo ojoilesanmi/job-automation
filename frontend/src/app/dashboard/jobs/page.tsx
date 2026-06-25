@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { parseSkills } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,8 +27,8 @@ interface Job {
   relocationAvailable: boolean;
   visaSponsorshipSignal: boolean;
   seniority: string;
-  requiredSkills: string[];
-  preferredSkills: string[];
+  requiredSkills: string;
+  preferredSkills: string;
   experienceYears: number;
   employmentType: string;
   applicationUrl: string;
@@ -116,10 +117,10 @@ export default function JobsPage() {
                       {job.employmentType && <Badge variant="secondary">{job.employmentType}</Badge>}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1">
-                      {job.requiredSkills?.slice(0, 5).map((s) => (
+                      {parseSkills(job.requiredSkills).slice(0, 5).map((s) => (
                         <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
                       ))}
-                      {job.requiredSkills && job.requiredSkills.length > 5 && <Badge variant="outline" className="text-xs">+{job.requiredSkills.length - 5}</Badge>}
+                      {parseSkills(job.requiredSkills).length > 5 && <Badge variant="outline" className="text-xs">+{parseSkills(job.requiredSkills).length - 5}</Badge>}
                     </div>
                   </div>
                 </CardContent>

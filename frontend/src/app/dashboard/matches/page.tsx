@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { parseSkills, parsePipeSeparated } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,10 +29,10 @@ interface JobMatch {
   roleScore: number;
   locationScore: number;
   salaryScore: number;
-  matchedSkills: string[];
-  missingSkills: string[];
-  reasonsToApply: string[];
-  reasonsToSkip: string[];
+  matchedSkills: string;
+  missingSkills: string;
+  reasonsToApply: string;
+  reasonsToSkip: string;
   status: string;
   createdAt: string;
 }
@@ -182,25 +183,25 @@ export default function MatchesPage() {
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {match.matchedSkills?.slice(0, 5).map((s) => (
+                        {parseSkills(match.matchedSkills).slice(0, 5).map((s) => (
                           <Badge key={s} variant="outline" className="text-xs">
                             {s}
                           </Badge>
                         ))}
-                        {match.matchedSkills && match.matchedSkills.length > 5 && (
+                        {parseSkills(match.matchedSkills).length > 5 && (
                           <Badge variant="outline" className="text-xs">
-                            +{match.matchedSkills.length - 5} more
+                            +{parseSkills(match.matchedSkills).length - 5} more
                           </Badge>
                         )}
                       </div>
 
-                      {match.reasonsToApply && match.reasonsToApply.length > 0 && (
+                      {parsePipeSeparated(match.reasonsToApply).length > 0 && (
                         <div className="mt-3">
                           <p className="text-xs font-medium text-green-700 mb-1">
                             Reasons to apply:
                           </p>
                           <ul className="text-xs text-muted-foreground space-y-0.5">
-                            {match.reasonsToApply.slice(0, 2).map((r, i) => (
+                            {parsePipeSeparated(match.reasonsToApply).slice(0, 2).map((r, i) => (
                               <li key={i} className="flex items-start gap-1">
                                 <CheckCircle className="h-3 w-3 mt-0.5 text-green-500 shrink-0" />
                                 {r}
@@ -210,13 +211,13 @@ export default function MatchesPage() {
                         </div>
                       )}
 
-                      {match.missingSkills && match.missingSkills.length > 0 && (
+                      {parseSkills(match.missingSkills).length > 0 && (
                         <div className="mt-2">
                           <p className="text-xs font-medium text-red-700 mb-1">
                             Missing skills:
                           </p>
                           <div className="flex flex-wrap gap-1">
-                            {match.missingSkills.map((s) => (
+                            {parseSkills(match.missingSkills).map((s) => (
                               <Badge
                                 key={s}
                                 variant="outline"

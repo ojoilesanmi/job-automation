@@ -17,6 +17,8 @@ import {
   LogOut,
   Target,
   Zap,
+  ScrollText,
+  Plug,
 } from "lucide-react";
 
 interface NavItem {
@@ -40,6 +42,8 @@ const adminItems: NavItem[] = [
   { label: "Users", href: "/dashboard/admin/users", icon: Users, permission: "user.read" },
   { label: "Roles", href: "/dashboard/admin/roles", icon: Shield, permission: "role.read" },
   { label: "Job Sources", href: "/dashboard/admin/job-sources", icon: Database, permission: "job-source.read" },
+  { label: "Connectors", href: "/dashboard/admin/connectors", icon: Plug, permission: "job-source.read" },
+  { label: "Audit Logs", href: "/dashboard/admin/audit-logs", icon: ScrollText, permission: "admin:audit:read" },
 ];
 
 export function Sidebar() {

@@ -2,37 +2,47 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Users } from "lucide-react";
 
 interface UserRow {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   roles: string[];
-  enabled: boolean;
+  createdAt: string;
+}
+
+interface UsersResponse {
+  users: UserRow[];
+  totalElements: number;
+  totalPages: number;
+  currentPage: number;
 }
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    api.get<UserRow[]>("/api/v1/admin/users").then(setUsers).catch(() => setUsers([])).finally(() => setLoading(false));
+    api.get<UsersResponse>("/api/v1/admin/users")
+      .then((data) => { setUsers(data.users); setTotal(data.totalElements); })
+      .catch(() => setUsers([]))
+      .finally(() => setLoading(false));
   }, []);
 
   const toggleRole = async (userId: string, role: string, add: boolean) => {
     try {
       if (add) {
-        await api.post(`/api/v1/admin/users/${userId}/roles`, { roleName: role });
+        const updated = await api.post<UserRow>(`/api/v1/admin/users/${userId}/roles`, { roleName: role });
+        setUsers(users.map((u) => u.id === userId ? { ...u, roles: updated.roles } : u));
       } else {
-        await api.del(`/api/v1/admin/users/${userId}/roles/${role}`);
+        const updated = await api.del<UserRow>(`/api/v1/admin/users/${userId}/roles/${role}`);
+        setUsers(users.map((u) => u.id === userId ? { ...u, roles: updated.roles } : u));
       }
-      setUsers(users.map((u) => u.id === userId ? { ...u, roles: add ? [...u.roles, role] : u.roles.filter((r) => r !== role) } : u));
     } catch {}
   };
 
@@ -42,7 +52,10 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="flex items-center gap-2 text-2xl font-bold"><Users className="h-6 w-6" />Users</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="flex items-center gap-2 text-2xl font-bold"><Users className="h-6 w-6" />Users</h1>
+        <p className="text-sm text-muted-foreground">{total} users</p>
+      </div>
 
       <Card>
         <CardContent className="overflow-x-auto">
@@ -52,25 +65,29 @@ export default function UsersPage() {
                 <th className="p-3">Name</th>
                 <th className="p-3">Email</th>
                 <th className="p-3">Roles</th>
+                <th className="p-3">Joined</th>
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {users.map((user) => (
                 <tr key={user.id} className="border-b">
-                  <td className="p-3 font-medium">{user.firstName} {user.lastName}</td>
+                  <td className="p-3 font-medium">{user.fullName}</td>
                   <td className="p-3 text-muted-foreground">{user.email}</td>
                   <td className="p-3">
                     <div className="flex gap-1">
                       {user.roles.map((r) => <Badge key={r} variant="secondary">{r}</Badge>)}
                     </div>
                   </td>
+                  <td className="p-3 text-muted-foreground text-xs">
+                    {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "—"}
+                  </td>
                   <td className="p-3">
                     <div className="flex gap-1">
                       {!user.roles.includes("ADMIN") && (
                         <Button size="sm" variant="outline" onClick={() => toggleRole(user.id, "ADMIN", true)}>Make admin</Button>
                       )}
-                      {user.roles.includes("ADMIN") && (
+                      {user.roles.includes("ADMIN") && !user.roles.includes("SUPER_ADMIN") && (
                         <Button size="sm" variant="ghost" onClick={() => toggleRole(user.id, "ADMIN", false)}>Remove admin</Button>
                       )}
                     </div>

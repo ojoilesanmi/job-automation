@@ -51,7 +51,8 @@ class ApiClient {
   get<T>(path: string) { return this.request<T>("GET", path); }
   post<T>(path: string, body?: unknown) { return this.request<T>("POST", path, body); }
   put<T>(path: string, body?: unknown) { return this.request<T>("PUT", path, body); }
-  del<T>(path: string) { return this.request<T>("DELETE", path); }
+  patch<T>(path: string, body?: unknown) { return this.request<T>("PATCH", path, body); }
+  del<T>(path: string, body?: unknown) { return this.request<T>("DELETE", path, body); }
 
   async upload<T>(path: string, file: File, fieldName = "file"): Promise<T> {
     const headers: Record<string, string> = {};

@@ -140,4 +140,12 @@ public class AdminController {
     public ResponseEntity<BaseResponse<Map<String, String>>> getConnectors() {
         return ResponseEntity.ok(BaseResponse.success(jobDiscoveryService.getAvailableConnectors()));
     }
+
+    @GetMapping("/audit-logs")
+    @RequireRole("ADMIN")
+    public ResponseEntity<BaseResponse<AuditLogListResponse>> getAuditLogs(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return ResponseEntity.ok(BaseResponse.success(adminService.getAuditLogs(page, size)));
+    }
 }

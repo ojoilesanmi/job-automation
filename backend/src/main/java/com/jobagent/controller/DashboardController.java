@@ -28,7 +28,7 @@ public class DashboardController {
             "totalJobs", overview.totalJobsDiscovered(),
             "pendingApprovals", overview.pendingApproval(),
             "appliedThisWeek", overview.applicationsSubmitted(),
-            "averageMatchScore", overview.strongMatches()
+            "averageMatchScore", overview.responseRate()
         );
         return ResponseEntity.ok(BaseResponse.success(stats));
     }

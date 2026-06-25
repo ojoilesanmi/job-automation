@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Upload, FileText, Check } from "lucide-react";
+import { Plus, X, Upload, FileText, Check, Trash2 } from "lucide-react";
 
 interface Experience {
   id: string;
@@ -17,7 +17,7 @@ interface Experience {
   description: string;
   startDate: string;
   endDate: string;
-  isCurrent: boolean;
+  achievements: string;
 }
 
 interface Project {
@@ -25,7 +25,15 @@ interface Project {
   name: string;
   description: string;
   url: string;
-  technologies: string[];
+  technologies: string;
+}
+
+interface Skill {
+  id: string;
+  skillName: string;
+  skillType: string;
+  proficiency: string;
+  yearsUsed: number | null;
 }
 
 interface CvDocument {
@@ -45,7 +53,7 @@ interface Profile {
   location: string;
   yearsOfExperience: number;
   primaryRole: string;
-  skills: string[];
+  skills: Skill[];
   experiences: Experience[];
   projects: Project[];
   createdAt: string;
@@ -64,6 +72,9 @@ export default function ProfilePage() {
   const [cvUploading, setCvUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [expForm, setExpForm] = useState({ company: "", title: "", description: "", startDate: "", endDate: "", achievements: "" });
+  const [projForm, setProjForm] = useState({ name: "", description: "", url: "", technologies: "" });
 
   useEffect(() => {
     Promise.all([
@@ -113,13 +124,20 @@ export default function ProfilePage() {
   };
 
   const saveProfile = async () => {
+    if (!profile) return;
     setSaving(true);
     setSaved(false);
     try {
-      const updated = profile!.id
-        ? await api.put<Profile>("/api/v1/profile", profile)
-        : await api.post<Profile>("/api/v1/profile", profile);
+      const updated = await api.put<Profile>("/api/v1/profile", profile);
       setProfile(updated);
+      await api.put("/api/v1/profile/skills", {
+        skills: profile.skills.map((s) => ({
+          skillName: s.skillName,
+          skillType: s.skillType || "technical",
+          proficiency: s.proficiency || "intermediate",
+          yearsUsed: s.yearsUsed || null,
+        })),
+      });
       setSaved(true);
       if (savedTimeout.current) clearTimeout(savedTimeout.current);
       savedTimeout.current = setTimeout(() => setSaved(false), 2000);
@@ -128,14 +146,90 @@ export default function ProfilePage() {
   };
 
   const addSkill = () => {
-    if (newSkill.trim()) {
-      setProfile({ ...profile!, skills: [...profile!.skills, newSkill.trim()] });
+    if (newSkill.trim() && profile) {
+      setProfile({
+        ...profile,
+        skills: [...profile.skills, { id: "", skillName: newSkill.trim(), skillType: "technical", proficiency: "intermediate", yearsUsed: null }],
+      });
       setNewSkill("");
     }
   };
 
-  const removeSkill = (s: string) => {
-    setProfile({ ...profile!, skills: profile!.skills.filter((x) => x !== s) });
+  const removeSkill = (skillName: string) => {
+    if (!profile) return;
+    setProfile({ ...profile, skills: profile.skills.filter((s) => s.skillName !== skillName) });
+  };
+
+  const saveExperience = async () => {
+    if (!profile) return;
+    const allExps = [
+      ...profile.experiences.map((e) => ({
+        company: e.company, title: e.title, description: e.description || null,
+        startDate: e.startDate || null, endDate: e.endDate || null, achievements: e.achievements || null,
+      })),
+      ...(expForm.company && expForm.title ? [{
+        company: expForm.company, title: expForm.title, description: expForm.description || null,
+        startDate: expForm.startDate || null, endDate: expForm.endDate || null, achievements: expForm.achievements || null,
+      }] : []),
+    ];
+    if (allExps.length === 0) return;
+    try {
+      await api.put("/api/v1/profile/experience", { experiences: allExps });
+      const updated = await api.get<Profile>("/api/v1/profile");
+      setProfile(updated);
+      setExpForm({ company: "", title: "", description: "", startDate: "", endDate: "", achievements: "" });
+    } catch {}
+  };
+
+  const removeExperience = async (index: number) => {
+    if (!profile) return;
+    const allExps = profile.experiences
+      .filter((_, i) => i !== index)
+      .map((e) => ({
+        company: e.company, title: e.title, description: e.description || null,
+        startDate: e.startDate || null, endDate: e.endDate || null, achievements: e.achievements || null,
+      }));
+    try {
+      await api.put("/api/v1/profile/experience", { experiences: allExps });
+      const updated = await api.get<Profile>("/api/v1/profile");
+      setProfile(updated);
+    } catch {}
+  };
+
+  const saveProject = async () => {
+    if (!profile) return;
+    const allProjs = [
+      ...profile.projects.map((p) => ({
+        name: p.name, description: p.description || null,
+        technologies: p.technologies || null, url: p.url || null,
+      })),
+      ...(projForm.name ? [{
+        name: projForm.name, description: projForm.description || null,
+        technologies: projForm.technologies || null, url: projForm.url || null,
+      }] : []),
+    ];
+    if (allProjs.length === 0) return;
+    try {
+      await api.put("/api/v1/profile/projects", { projects: allProjs });
+      const updated = await api.get<Profile>("/api/v1/profile");
+      setProfile(updated);
+      setProjForm({ name: "", description: "", url: "", technologies: "" });
+    } catch {}
+  };
+
+  const removeProject = async (index: number) => {
+    if (!profile) return;
+    const allProjs = profile.projects
+      .filter((_, i) => i !== index)
+      .map((p) => ({
+        name: p.name, description: p.description || null,
+        technologies: p.technologies || null, url: p.url || null,
+      }));
+    try {
+      await api.put("/api/v1/profile/projects", { projects: allProjs });
+      const updated = await api.get<Profile>("/api/v1/profile");
+      setProfile(updated);
+    } catch {}
   };
 
   if (loading) {
@@ -176,18 +270,10 @@ export default function ProfilePage() {
             </div>
             <Button onClick={saveProfile} disabled={saving}>
               {saving ? (
-                <>
-                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Saving...
-                </>
+                <><span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />Saving...</>
               ) : saved ? (
-                <>
-                  <Check className="mr-1.5 h-4 w-4" />
-                  Saved
-                </>
-              ) : (
-                "Save profile"
-              )}
+                <><Check className="mr-1.5 h-4 w-4" />Saved</>
+              ) : "Save profile"}
             </Button>
           </CardContent>
         </Card>
@@ -202,50 +288,83 @@ export default function ProfilePage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {profile.skills.map((s) => (
-                  <Badge key={s} variant="secondary" className="gap-1">
-                    {s}
-                    <button onClick={() => removeSkill(s)}><X className="h-3 w-3" /></button>
+                  <Badge key={s.skillName} variant="secondary" className="gap-1">
+                    {s.skillName}
+                    <button onClick={() => removeSkill(s.skillName)}><X className="h-3 w-3" /></button>
                   </Badge>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {profile.experiences && profile.experiences.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Experience</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {profile.experiences.map((exp) => (
-                  <div key={exp.id} className="rounded-md border p-3">
+          <Card>
+            <CardHeader><CardTitle>Experience</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {profile.experiences.map((exp, i) => (
+                <div key={exp.id || i} className="flex items-start justify-between rounded-md border p-3">
+                  <div>
                     <p className="font-medium">{exp.title}</p>
                     <p className="text-sm text-muted-foreground">{exp.company}</p>
+                    {exp.startDate && <p className="text-xs text-muted-foreground">{exp.startDate} – {exp.endDate || "Present"}</p>}
                     {exp.description && <p className="mt-1 text-sm">{exp.description}</p>}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                  <Button size="sm" variant="ghost" onClick={() => removeExperience(i)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Add experience</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="Company" value={expForm.company} onChange={(e) => setExpForm({ ...expForm, company: e.target.value })} />
+                  <Input placeholder="Title" value={expForm.title} onChange={(e) => setExpForm({ ...expForm, title: e.target.value })} />
+                  <Input placeholder="Start date (YYYY-MM)" value={expForm.startDate} onChange={(e) => setExpForm({ ...expForm, startDate: e.target.value })} />
+                  <Input placeholder="End date (YYYY-MM)" value={expForm.endDate} onChange={(e) => setExpForm({ ...expForm, endDate: e.target.value })} />
+                </div>
+                <Textarea placeholder="Description" rows={2} value={expForm.description} onChange={(e) => setExpForm({ ...expForm, description: e.target.value })} />
+                <Button size="sm" onClick={saveExperience} disabled={!expForm.company || !expForm.title}>
+                  <Plus className="mr-1 h-3 w-3" />Add experience
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-          {profile.projects && profile.projects.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Projects</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {profile.projects.map((proj) => (
-                  <div key={proj.id} className="rounded-md border p-3">
+          <Card>
+            <CardHeader><CardTitle>Projects</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {profile.projects.map((proj, i) => (
+                <div key={proj.id || i} className="flex items-start justify-between rounded-md border p-3">
+                  <div>
                     <p className="font-medium">{proj.name}</p>
                     {proj.description && <p className="text-sm">{proj.description}</p>}
-                    {proj.technologies && proj.technologies.length > 0 && (
+                    {proj.technologies && (
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {proj.technologies.map((t) => (
-                          <Badge key={t} variant="outline" className="text-xs">{t}</Badge>
+                        {proj.technologies.split(",").map((t) => (
+                          <Badge key={t.trim()} variant="outline" className="text-xs">{t.trim()}</Badge>
                         ))}
                       </div>
                     )}
+                    {proj.url && <a href={proj.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">{proj.url}</a>}
                   </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
+                  <Button size="sm" variant="ghost" onClick={() => removeProject(i)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <div className="border-t pt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Add project</p>
+                <Input placeholder="Project name" value={projForm.name} onChange={(e) => setProjForm({ ...projForm, name: e.target.value })} />
+                <Textarea placeholder="Description" rows={2} value={projForm.description} onChange={(e) => setProjForm({ ...projForm, description: e.target.value })} />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="Technologies (comma-separated)" value={projForm.technologies} onChange={(e) => setProjForm({ ...projForm, technologies: e.target.value })} />
+                  <Input placeholder="URL" value={projForm.url} onChange={(e) => setProjForm({ ...projForm, url: e.target.value })} />
+                </div>
+                <Button size="sm" onClick={saveProject} disabled={!projForm.name}>
+                  <Plus className="mr-1 h-3 w-3" />Add project
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader><CardTitle>CVs</CardTitle></CardHeader>

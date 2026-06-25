@@ -6,23 +6,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Database, Power, PowerOff } from "lucide-react";
+import { Plus, Database, Power, PowerOff, Trash2, RefreshCw } from "lucide-react";
 
 interface JobSource {
   id: string;
   name: string;
-  type: string;
-  url: string;
+  sourceType: string;
+  baseUrl: string;
   enabled: boolean;
-  lastRunAt: string;
-  jobsFound: number;
+  configJson: Record<string, unknown>;
+  createdAt: string;
 }
 
 export default function JobSourcesPage() {
   const [sources, setSources] = useState<JobSource[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [newSource, setNewSource] = useState({ name: "", type: "api", url: "" });
+  const [newSource, setNewSource] = useState({ name: "", sourceType: "api", baseUrl: "" });
+  const [discovering, setDiscovering] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<JobSource[]>("/api/v1/admin/job-sources").then(setSources).catch(() => setSources([])).finally(() => setLoading(false));
@@ -34,16 +35,31 @@ export default function JobSourcesPage() {
     try {
       const src = await api.post<JobSource>("/api/v1/admin/job-sources", newSource);
       setSources([...sources, src]);
-      setNewSource({ name: "", type: "api", url: "" });
+      setNewSource({ name: "", sourceType: "api", baseUrl: "" });
     } catch {}
     setCreating(false);
   };
 
-  const toggleSource = async (id: string, enabled: boolean) => {
+  const toggleSource = async (id: string) => {
     try {
-      await api.put(`/api/v1/admin/job-sources/${id}`, { enabled: !enabled });
-      setSources(sources.map((s) => (s.id === id ? { ...s, enabled: !enabled } : s)));
+      await api.patch(`/api/v1/admin/job-sources/${id}/toggle`);
+      setSources(sources.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
     } catch {}
+  };
+
+  const deleteSource = async (id: string) => {
+    try {
+      await api.del(`/api/v1/admin/job-sources/${id}`);
+      setSources(sources.filter((s) => s.id !== id));
+    } catch {}
+  };
+
+  const runDiscovery = async (id: string) => {
+    setDiscovering(id);
+    try {
+      await api.post(`/api/v1/admin/job-sources/${id}/discover`);
+    } catch {}
+    setDiscovering(null);
   };
 
   if (loading) {
@@ -59,8 +75,8 @@ export default function JobSourcesPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             <Input placeholder="Name" value={newSource.name} onChange={(e) => setNewSource({ ...newSource, name: e.target.value })} />
-            <Input placeholder="Type (api/scrape)" value={newSource.type} onChange={(e) => setNewSource({ ...newSource, type: e.target.value })} />
-            <Input placeholder="URL" value={newSource.url} onChange={(e) => setNewSource({ ...newSource, url: e.target.value })} />
+            <Input placeholder="Type (api/scrape)" value={newSource.sourceType} onChange={(e) => setNewSource({ ...newSource, sourceType: e.target.value })} />
+            <Input placeholder="Base URL" value={newSource.baseUrl} onChange={(e) => setNewSource({ ...newSource, baseUrl: e.target.value })} />
           </div>
           <Button onClick={create} disabled={creating}>
             <Plus className="mr-2 h-4 w-4" />{creating ? "Adding..." : "Add source"}
@@ -75,18 +91,27 @@ export default function JobSourcesPage() {
               <div>
                 <div className="flex items-center gap-3">
                   <h3 className="font-medium">{src.name}</h3>
-                  <Badge variant="outline">{src.type}</Badge>
-                  <Badge variant={src.enabled ? "success" : "secondary"}>
+                  <Badge variant="outline">{src.sourceType}</Badge>
+                  <Badge variant={src.enabled ? "default" : "secondary"}>
                     {src.enabled ? "Active" : "Disabled"}
                   </Badge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {src.url} &middot; {src.jobsFound} jobs &middot; Last run: {src.lastRunAt ? new Date(src.lastRunAt).toLocaleString() : "Never"}
+                  {src.baseUrl || "No URL"} &middot; Created: {src.createdAt ? new Date(src.createdAt).toLocaleDateString() : "—"}
                 </p>
               </div>
-              <Button size="sm" variant="outline" onClick={() => toggleSource(src.id, src.enabled)}>
-                {src.enabled ? <><PowerOff className="mr-2 h-3 w-3" />Disable</> : <><Power className="mr-2 h-3 w-3" />Enable</>}
-              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={() => runDiscovery(src.id)} disabled={discovering === src.id}>
+                  <RefreshCw className={`mr-1 h-3 w-3 ${discovering === src.id ? "animate-spin" : ""}`} />
+                  {discovering === src.id ? "Running..." : "Discover"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => toggleSource(src.id)}>
+                  {src.enabled ? <><PowerOff className="mr-1 h-3 w-3" />Disable</> : <><Power className="mr-1 h-3 w-3" />Enable</>}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => deleteSource(src.id)}>
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ))}
