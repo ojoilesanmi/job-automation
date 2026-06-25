@@ -151,7 +151,7 @@ export default function MatchesPage() {
         <div className="space-y-4">
           {matches.map((match) => {
             const st = statusConfig[match.status] || statusConfig.scored;
-            const score = Math.round(match.fitScore * 100);
+            const score = Math.round(match.fitScore);
 
             return (
               <Card key={match.id} className="hover:shadow-md transition-shadow">

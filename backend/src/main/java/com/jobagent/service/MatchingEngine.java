@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -72,8 +74,9 @@ public class MatchingEngine {
         List<String> jobPreferredSkills = parseSkills(job.getPreferredSkills());
 
         Set<String> matchedSkills = new HashSet<>(userSkillNames);
-        matchedSkills.retainAll(jobRequiredSkills.stream().map(String::toLowerCase).collect(Collectors.toSet()));
-        matchedSkills.retainAll(jobPreferredSkills.stream().map(String::toLowerCase).collect(Collectors.toSet()));
+        Set<String> jobSkills = new HashSet<>(jobRequiredSkills.stream().map(String::toLowerCase).collect(Collectors.toSet()));
+        jobSkills.addAll(jobPreferredSkills.stream().map(String::toLowerCase).collect(Collectors.toSet()));
+        matchedSkills.retainAll(jobSkills);
 
         Set<String> missingRequired = new HashSet<>(jobRequiredSkills.stream().map(String::toLowerCase).collect(Collectors.toSet()));
         missingRequired.removeAll(userSkillNames);
@@ -222,8 +225,13 @@ public class MatchingEngine {
         return toResponse(match);
     }
 
+    private static final Set<String> ALLOWED_MATCH_STATUSES = Set.of("scored", "approved", "rejected", "saved", "pending");
+
     @Transactional
     public void updateMatchStatus(UUID userId, UUID matchId, String status) {
+        if (!ALLOWED_MATCH_STATUSES.contains(status)) {
+            throw new IllegalArgumentException("Invalid status: " + status);
+        }
         JobMatch match = jobMatchRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Match not found"));
         assertOwnership(match, userId);
@@ -296,7 +304,15 @@ public class MatchingEngine {
     private BigDecimal calculateExperienceScore(List<WorkExperience> experiences, Integer requiredYears) {
         if (requiredYears == null || requiredYears == 0) return new BigDecimal("80.00");
 
-        int totalYears = experiences.size();
+        int totalMonths = 0;
+        for (WorkExperience exp : experiences) {
+            if (exp.getStartDate() != null) {
+                LocalDate end = exp.getEndDate() != null ? exp.getEndDate() : LocalDate.now();
+                totalMonths += java.time.temporal.ChronoUnit.MONTHS.between(exp.getStartDate(), end);
+            }
+        }
+        double totalYears = totalMonths / 12.0;
+
         if (totalYears >= requiredYears) return new BigDecimal("100.00");
         if (totalYears >= requiredYears * 0.7) return new BigDecimal("80.00");
         if (totalYears >= requiredYears * 0.5) return new BigDecimal("60.00");

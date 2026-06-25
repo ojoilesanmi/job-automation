@@ -1,6 +1,7 @@
 package com.jobagent.service;
 
 import com.jobagent.dto.*;
+import com.jobagent.exception.ForbiddenException;
 import com.jobagent.exception.ResourceNotFoundException;
 import com.jobagent.model.*;
 import com.jobagent.repository.*;
@@ -86,6 +87,7 @@ public class ApplicationService {
     public ApplicationResponse getApplication(UUID userId, UUID appId) {
         Application app = applicationRepository.findById(appId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+        assertOwnership(app, userId);
         return toResponse(app);
     }
 
@@ -129,9 +131,16 @@ public class ApplicationService {
     public ApplicationResponse addNote(UUID userId, UUID appId, String notes) {
         Application app = applicationRepository.findById(appId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+        assertOwnership(app, userId);
         app.setNotes(notes);
         app = applicationRepository.save(app);
         return toResponse(app);
+    }
+
+    private void assertOwnership(Application app, UUID userId) {
+        if (!app.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have access to this application");
+        }
     }
 
     private void logAudit(UUID userId, String action, String entityType, UUID entityId) {

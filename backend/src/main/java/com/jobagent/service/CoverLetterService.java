@@ -2,6 +2,7 @@ package com.jobagent.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.jobagent.dto.*;
+import com.jobagent.exception.ForbiddenException;
 import com.jobagent.exception.ResourceNotFoundException;
 import com.jobagent.model.*;
 import com.jobagent.repository.*;
@@ -143,6 +144,7 @@ public class CoverLetterService {
     public CoverLetterResponse updateCoverLetter(UUID userId, UUID coverLetterId, String content) {
         CoverLetter coverLetter = coverLetterRepository.findById(coverLetterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cover letter not found"));
+        assertOwnership(coverLetter, userId);
 
         coverLetter.setContent(content);
         coverLetter.setVersion(coverLetter.getVersion() + 1);
@@ -154,6 +156,7 @@ public class CoverLetterService {
     public CoverLetterResponse regenerateCoverLetter(UUID userId, UUID coverLetterId) {
         CoverLetter existing = coverLetterRepository.findById(coverLetterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cover letter not found"));
+        assertOwnership(existing, userId);
 
         GenerateCoverLetterRequest request = new GenerateCoverLetterRequest(
                 existing.getJob().getId(),
@@ -221,6 +224,12 @@ public class CoverLetterService {
             if (found.size() >= 3) break;
         }
         return found.toArray(new String[0]);
+    }
+
+    private void assertOwnership(CoverLetter coverLetter, UUID userId) {
+        if (!coverLetter.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have access to this cover letter");
+        }
     }
 
     private CoverLetterResponse toResponse(CoverLetter cl, Job job) {
