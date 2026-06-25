@@ -4,6 +4,8 @@ import com.jobagent.model.JobMatch;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,4 +22,7 @@ public interface JobMatchRepository extends JpaRepository<JobMatch, UUID> {
     long countByUserIdAndStatus(UUID userId, String status);
 
     List<JobMatch> findByUserIdAndStatusIn(UUID userId, List<String> statuses);
+
+    @Query("SELECT COALESCE(AVG(jm.fitScore), 0) FROM JobMatch jm WHERE jm.user.id = :userId")
+    double averageFitScoreByUserId(@Param("userId") UUID userId);
 }

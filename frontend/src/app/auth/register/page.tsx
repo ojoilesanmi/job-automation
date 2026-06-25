@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Lock, User } from "lucide-react";
+import { Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 
 function RegisterForm() {
   const { register } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -66,7 +67,10 @@ function RegisterForm() {
             <Label>Password</Label>
             <div className="relative">
               <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input type="password" placeholder="••••••••" className="pl-9" value={form.password} onChange={set("password")} required minLength={8} />
+              <Input type={showPassword ? "text" : "password"} placeholder="••••••••" className="pl-9 pr-9" value={form.password} onChange={set("password")} required minLength={8} />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-muted-foreground hover:text-foreground">
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
           </div>
         </CardContent>

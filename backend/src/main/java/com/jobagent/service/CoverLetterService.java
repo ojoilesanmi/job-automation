@@ -130,6 +130,15 @@ public class CoverLetterService {
         return new CoverLetterListResponse(responses);
     }
 
+    @Transactional(readOnly = true)
+    public CoverLetterListResponse getAllCoverLetters(UUID userId) {
+        List<CoverLetter> letters = coverLetterRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        List<CoverLetterResponse> responses = letters.stream()
+                .map(cl -> toResponse(cl, cl.getJob()))
+                .collect(Collectors.toList());
+        return new CoverLetterListResponse(responses);
+    }
+
     @Transactional
     public CoverLetterResponse updateCoverLetter(UUID userId, UUID coverLetterId, String content) {
         CoverLetter coverLetter = coverLetterRepository.findById(coverLetterId)

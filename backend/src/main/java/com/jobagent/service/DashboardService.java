@@ -19,6 +19,8 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardOverviewResponse getOverview(UUID userId) {
+        double avgScore = matchRepository.averageFitScoreByUserId(userId);
+
         return new DashboardOverviewResponse(
                 jobRepository.count(),
                 matchRepository.countByUserIdAndStatus(userId, "scored"),
@@ -27,7 +29,7 @@ public class DashboardService {
                 matchRepository.countByUserIdAndStatus(userId, "rejected"),
                 applicationRepository.countByUserIdAndStatus(userId, "interview"),
                 applicationRepository.countByUserIdAndStatus(userId, "assessment"),
-                0.0,
+                Math.round(avgScore * 100.0) / 100.0,
                 Collections.emptyMap(),
                 Collections.emptyMap()
         );

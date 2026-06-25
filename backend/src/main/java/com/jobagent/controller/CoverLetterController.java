@@ -34,6 +34,13 @@ public class CoverLetterController {
                         coverLetterService.generateCoverLetter(SecurityUtils.getCurrentUserId(), request)));
     }
 
+    @GetMapping("/cover-letters")
+    @RequirePermission("cover_letter:read")
+    public ResponseEntity<BaseResponse<CoverLetterListResponse>> getAllCoverLetters() {
+        return ResponseEntity.ok(BaseResponse.success(
+                coverLetterService.getAllCoverLetters(SecurityUtils.getCurrentUserId())));
+    }
+
     @GetMapping("/jobs/{jobId}/cover-letters")
     @RequirePermission("cover_letter:read")
     public ResponseEntity<BaseResponse<CoverLetterListResponse>> getCoverLetters(@PathVariable UUID jobId) {

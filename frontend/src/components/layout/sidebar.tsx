@@ -16,6 +16,7 @@ import {
   Database,
   LogOut,
   Target,
+  Zap,
 } from "lucide-react";
 
 interface NavItem {
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { label: "My Profile", href: "/dashboard/profile", icon: User },
   { label: "Preferences", href: "/dashboard/preferences", icon: Settings },
   { label: "Jobs", href: "/dashboard/jobs", icon: Briefcase },
+  { label: "Matches", href: "/dashboard/matches", icon: Zap },
   { label: "Applications", href: "/dashboard/applications", icon: Target },
   { label: "Cover Letters", href: "/dashboard/cover-letters", icon: FileText },
 ];

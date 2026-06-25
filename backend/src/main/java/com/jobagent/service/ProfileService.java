@@ -161,6 +161,13 @@ public class ProfileService {
         return toCvResponse(cv);
     }
 
+    @Transactional(readOnly = true)
+    public UUID getDefaultCvId(UUID userId) {
+        return cvDocumentRepository.findByUserIdAndIsDefaultTrue(userId)
+                .map(CvDocument::getId)
+                .orElse(null);
+    }
+
     @Transactional
     public CvDocumentResponse uploadCv(UUID userId, MultipartFile file) {
         User user = new User();

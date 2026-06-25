@@ -1,5 +1,6 @@
 package com.jobagent.service;
 
+import com.jobagent.dto.JobMatchResponse;
 import com.jobagent.model.*;
 import com.jobagent.repository.*;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -24,10 +26,14 @@ import static org.mockito.Mockito.when;
 class MatchingEngineTest {
 
     @Mock private JobMatchRepository jobMatchRepository;
+    @Mock private JobRepository jobRepository;
     @Mock private ProfileSkillRepository skillRepository;
     @Mock private WorkExperienceRepository experienceRepository;
     @Mock private UserPreferencesRepository preferencesRepository;
     @Mock private AiServiceClient aiServiceClient;
+    @Mock private CoverLetterService coverLetterService;
+    @Mock private ApplicationService applicationService;
+    @Mock private ProfileService profileService;
 
     private MeterRegistry meterRegistry;
 
@@ -37,29 +43,45 @@ class MatchingEngineTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        // Inject manually since @InjectMocks won't overwrite final fields
         matchingEngine = new MatchingEngine(
-                jobMatchRepository, skillRepository, experienceRepository,
-                preferencesRepository, aiServiceClient, meterRegistry);
+                jobMatchRepository, jobRepository, skillRepository, experienceRepository,
+                preferencesRepository, aiServiceClient, coverLetterService,
+                applicationService, profileService, meterRegistry);
     }
 
     @Test
     void scoreJob_withNoSkillsAndNoPrefs_returnsReasonableScores() {
+        UUID jobId = java.util.UUID.randomUUID();
+        UUID userId = java.util.UUID.randomUUID();
+
+        Job job = Job.builder().title("Software Engineer").company("Acme")
+                .requiredSkills("Java, Python").preferredSkills("React")
+                .experienceYears(3).remoteType("full_remote").build();
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobMatchRepository.findByUserIdAndJobId(userId, jobId)).thenReturn(Optional.empty());
         when(jobMatchRepository.save(any(JobMatch.class))).thenAnswer(inv -> inv.getArgument(0));
         when(skillRepository.findByUserId(any())).thenReturn(Collections.emptyList());
         when(experienceRepository.findByUserIdOrderByStartDateDesc(any())).thenReturn(Collections.emptyList());
         when(preferencesRepository.findByUserId(any())).thenReturn(Optional.empty());
 
-        JobMatch result = matchingEngine.scoreJob(java.util.UUID.randomUUID(), java.util.UUID.randomUUID());
+        JobMatchResponse result = matchingEngine.scoreJob(userId, jobId);
 
-        assertThat(result.getFitScore()).isNotNull();
-        assertThat(result.getSkillsScore()).isNotNull();
-        assertThat(result.getExperienceScore()).isNotNull();
-        assertThat(result.getStatus()).isEqualTo("scored");
+        assertThat(result.fitScore()).isNotNull();
+        assertThat(result.skillsScore()).isNotNull();
+        assertThat(result.experienceScore()).isNotNull();
+        assertThat(result.status()).isEqualTo("scored");
     }
 
     @Test
     void scoreJob_withMatchingSkills_returnsHighFit() {
+        UUID jobId = java.util.UUID.randomUUID();
+        UUID userId = java.util.UUID.randomUUID();
+
+        Job job = Job.builder().title("Software Engineer").company("Acme")
+                .requiredSkills("Java").preferredSkills("")
+                .experienceYears(2).build();
+        when(jobRepository.findById(jobId)).thenReturn(Optional.of(job));
+        when(jobMatchRepository.findByUserIdAndJobId(userId, jobId)).thenReturn(Optional.empty());
         when(jobMatchRepository.save(any(JobMatch.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ProfileSkill skill = ProfileSkill.builder().skillName("Java").build();
@@ -67,11 +89,10 @@ class MatchingEngineTest {
         when(experienceRepository.findByUserIdOrderByStartDateDesc(any())).thenReturn(Collections.emptyList());
         when(preferencesRepository.findByUserId(any())).thenReturn(Optional.empty());
 
-        // scoreJob creates its own Job stub; just verify it runs and produces a result
-        JobMatch result = matchingEngine.scoreJob(java.util.UUID.randomUUID(), java.util.UUID.randomUUID());
+        JobMatchResponse result = matchingEngine.scoreJob(userId, jobId);
 
-        assertThat(result.getFitScore()).isNotNull();
-        assertThat(result.getSkillsScore()).isNotNull();
-        assertThat(result.getStatus()).isEqualTo("scored");
+        assertThat(result.fitScore()).isNotNull();
+        assertThat(result.skillsScore()).isNotNull();
+        assertThat(result.status()).isEqualTo("scored");
     }
 }

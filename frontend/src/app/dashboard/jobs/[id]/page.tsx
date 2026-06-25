@@ -50,6 +50,7 @@ export default function JobDetailPage() {
     setMatching(true);
     try {
       await api.post(`/api/v1/matches`, { jobId: id });
+      router.push("/dashboard/matches");
     } catch {}
     setMatching(false);
   };

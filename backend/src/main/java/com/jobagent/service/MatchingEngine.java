@@ -1,8 +1,8 @@
 package com.jobagent.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.jobagent.dto.JobMatchResponse;
-import com.jobagent.dto.MatchListResponse;
+import com.jobagent.dto.*;
+import com.jobagent.exception.ForbiddenException;
 import com.jobagent.exception.ResourceNotFoundException;
 import com.jobagent.model.*;
 import com.jobagent.repository.*;
@@ -27,19 +27,29 @@ import java.util.stream.Collectors;
 public class MatchingEngine {
 
     private final JobMatchRepository jobMatchRepository;
+    private final JobRepository jobRepository;
     private final ProfileSkillRepository skillRepository;
     private final WorkExperienceRepository experienceRepository;
     private final UserPreferencesRepository preferencesRepository;
     private final AiServiceClient aiServiceClient;
+    private final CoverLetterService coverLetterService;
+    private final ApplicationService applicationService;
+    private final ProfileService profileService;
     private final MeterRegistry meterRegistry;
 
     @Transactional
-    public JobMatch scoreJob(UUID userId, UUID jobId) {
+    public JobMatchResponse scoreJob(UUID userId, UUID jobId) {
         Timer.Sample sample = Timer.start(meterRegistry);
         User user = new User();
         user.setId(userId);
-        Job job = new Job();
-        job.setId(jobId);
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Job not found"));
+
+        Optional<JobMatch> existing = jobMatchRepository.findByUserIdAndJobId(userId, jobId);
+        if (existing.isPresent()) {
+            return toResponse(existing.get());
+        }
 
         List<ProfileSkill> userSkills = skillRepository.findByUserId(userId);
         List<WorkExperience> experiences = experienceRepository.findByUserIdOrderByStartDateDesc(userId);
@@ -106,7 +116,7 @@ public class MatchingEngine {
                 .description("Number of jobs scored")
                 .register(meterRegistry)
                 .increment();
-        return match;
+        return toResponse(match);
     }
 
     private Map<String, BigDecimal> computeScoresWithAiOrFallback(List<ProfileSkill> userSkills,
@@ -213,11 +223,54 @@ public class MatchingEngine {
     }
 
     @Transactional
-    public void updateMatchStatus(UUID matchId, String status) {
+    public void updateMatchStatus(UUID userId, UUID matchId, String status) {
         JobMatch match = jobMatchRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Match not found"));
+        assertOwnership(match, userId);
         match.setStatus(status);
         jobMatchRepository.save(match);
+    }
+
+    @Transactional
+    public ApproveMatchResponse approveMatch(UUID userId, UUID matchId) {
+        JobMatch match = jobMatchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found"));
+        assertOwnership(match, userId);
+
+        match.setStatus("approved");
+        jobMatchRepository.save(match);
+
+        JobMatchResponse matchResponse = toResponse(match);
+
+        CoverLetterResponse coverLetter = null;
+        String coverLetterError = null;
+        try {
+            coverLetter = coverLetterService.generateCoverLetter(userId,
+                    new GenerateCoverLetterRequest(match.getJob().getId(), null, "professional"));
+        } catch (Exception e) {
+            coverLetterError = e.getMessage();
+            log.error("Cover letter generation failed for match {}: {}", matchId, e.getMessage());
+        }
+
+        ApplicationResponse application = null;
+        String applicationError = null;
+        try {
+            UUID defaultCvId = profileService.getDefaultCvId(userId);
+            application = applicationService.createApplication(userId,
+                    new CreateApplicationRequest(match.getJob().getId(), defaultCvId,
+                            coverLetter != null ? coverLetter.id() : null, "approval"));
+        } catch (Exception e) {
+            applicationError = e.getMessage();
+            log.error("Application creation failed for match {}: {}", matchId, e.getMessage());
+        }
+
+        return new ApproveMatchResponse(matchResponse, coverLetter, application, coverLetterError, applicationError);
+    }
+
+    private void assertOwnership(JobMatch match, UUID userId) {
+        if (!match.getUser().getId().equals(userId)) {
+            throw new ForbiddenException("You do not have access to this match");
+        }
     }
 
     private BigDecimal calculateSkillsScore(Set<String> userSkills, List<String> required, List<String> preferred) {
