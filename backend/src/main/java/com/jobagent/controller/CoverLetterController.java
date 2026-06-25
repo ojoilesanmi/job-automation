@@ -5,7 +5,9 @@ import com.jobagent.security.RequirePermission;
 import com.jobagent.security.SecurityUtils;
 import com.jobagent.service.CoverLetterService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -62,5 +64,31 @@ public class CoverLetterController {
     public ResponseEntity<BaseResponse<CoverLetterResponse>> regenerateCoverLetter(@PathVariable UUID id) {
         return ResponseEntity.ok(BaseResponse.success("Cover letter regenerated",
                 coverLetterService.regenerateCoverLetter(SecurityUtils.getCurrentUserId(), id)));
+    }
+
+    @GetMapping("/cover-letters/{id}/export")
+    @RequirePermission("cover_letter:read")
+    public ResponseEntity<byte[]> exportCoverLetter(
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "text") String format) {
+        CoverLetterResponse cl = coverLetterService.getCoverLetterById(SecurityUtils.getCurrentUserId(), id);
+        String content = cl.content();
+        String title = cl.jobTitle() != null ? cl.jobTitle() : "Cover Letter";
+
+        if ("pdf".equals(format)) {
+            String html = "<html><body><h1>" + title + "</h1><p>" +
+                    content.replace("\n", "</p><p>") + "</p></body></html>";
+            byte[] pdfBytes = html.getBytes();
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cover-letter-" + id + ".html\"")
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(pdfBytes);
+        }
+
+        byte[] textBytes = content.getBytes();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cover-letter-" + id + ".txt\"")
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(textBytes);
     }
 }

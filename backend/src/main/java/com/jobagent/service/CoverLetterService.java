@@ -140,6 +140,14 @@ public class CoverLetterService {
         return new CoverLetterListResponse(responses);
     }
 
+    @Transactional(readOnly = true)
+    public CoverLetterResponse getCoverLetterById(UUID userId, UUID coverLetterId) {
+        CoverLetter cl = coverLetterRepository.findById(coverLetterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cover letter not found"));
+        assertOwnership(cl, userId);
+        return toResponse(cl, cl.getJob());
+    }
+
     @Transactional
     public CoverLetterResponse updateCoverLetter(UUID userId, UUID coverLetterId, String content) {
         CoverLetter coverLetter = coverLetterRepository.findById(coverLetterId)

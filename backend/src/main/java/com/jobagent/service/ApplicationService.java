@@ -24,6 +24,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ApplicationService {
 
+    private static final java.util.Set<String> ALLOWED_APP_TRANSITIONS = java.util.Set.of(
+            "discovered", "pending_approval", "approved", "submitted", "interview",
+            "assessment", "offer", "accepted", "rejected", "withdrawn"
+    );
+
     private final ApplicationRepository applicationRepository;
     private final ApplicationEventRepository eventRepository;
     private final JobRepository jobRepository;
@@ -93,8 +98,12 @@ public class ApplicationService {
 
     @Transactional
     public ApplicationResponse updateStatus(UUID userId, UUID appId, String newStatus) {
+        if (!ALLOWED_APP_TRANSITIONS.contains(newStatus)) {
+            throw new IllegalArgumentException("Invalid application status: " + newStatus);
+        }
         Application app = applicationRepository.findById(appId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+        assertOwnership(app, userId);
 
         String oldStatus = app.getStatus();
         app.setStatus(newStatus);

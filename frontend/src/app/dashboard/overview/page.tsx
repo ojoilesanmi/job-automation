@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Clock, Send, TrendingUp } from "lucide-react";
+import { Briefcase, Clock, Send, TrendingUp, Globe, BarChart3 } from "lucide-react";
 
 interface Stats {
   totalJobs: number;
@@ -13,15 +13,28 @@ interface Stats {
   averageMatchScore: number;
 }
 
+interface Pipeline {
+  byStatus: Record<string, number>;
+  byCountry: { country: string; count: number }[];
+  bySource: { sourceId: string; sourceName: string; count: number }[];
+  totalApplications: number;
+  thisWeekApplications: number;
+  thisMonthApplications: number;
+}
+
 export default function OverviewPage() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<Stats>("/api/v1/dashboard/stats")
-      .then(setStats)
-      .catch(() => setStats({ totalJobs: 0, pendingApprovals: 0, appliedThisWeek: 0, averageMatchScore: 0 }))
-      .finally(() => setLoading(false));
+    Promise.all([
+      api.get<Stats>("/api/v1/dashboard/stats").catch(() => null),
+      api.get<Pipeline>("/api/v1/dashboard/pipeline").catch(() => null),
+    ]).then(([s, p]) => {
+      setStats(s);
+      setPipeline(p);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -34,6 +47,16 @@ export default function OverviewPage() {
     { label: "Applied this week", value: stats?.appliedThisWeek ?? 0, icon: Send, color: "text-green-600" },
     { label: "Avg match score", value: `${stats?.averageMatchScore ?? 0}%`, icon: TrendingUp, color: "text-purple-600" },
   ];
+
+  const statusColors: Record<string, string> = {
+    discovered: "bg-gray-100",
+    pending_approval: "bg-yellow-100",
+    approved: "bg-blue-100",
+    submitted: "bg-green-100",
+    interview: "bg-purple-100",
+    rejected: "bg-red-100",
+    offer: "bg-emerald-100",
+  };
 
   return (
     <div className="space-y-6">
@@ -53,16 +76,75 @@ export default function OverviewPage() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent matches</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No matches yet. Set up your preferences and upload your CV to get started.
-          </p>
-        </CardContent>
-      </Card>
+      {pipeline && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><BarChart3 className="h-4 w-4" />Pipeline by Status</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {Object.entries(pipeline.byStatus).map(([status, count]) => (
+                <div key={status} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className={`h-3 w-3 rounded-full ${statusColors[status] || "bg-gray-100"}`} />
+                    <span className="text-sm capitalize">{status.replace(/_/g, " ")}</span>
+                  </div>
+                  <span className="text-sm font-medium">{count}</span>
+                </div>
+              ))}
+              {Object.keys(pipeline.byStatus).length === 0 && (
+                <p className="text-sm text-muted-foreground">No applications yet</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Globe className="h-4 w-4" />Applications by Country</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {pipeline.byCountry.map(({ country, count }) => (
+                <div key={country} className="flex items-center justify-between">
+                  <span className="text-sm">{country}</span>
+                  <span className="text-sm font-medium">{count}</span>
+                </div>
+              ))}
+              {pipeline.byCountry.length === 0 && (
+                <p className="text-sm text-muted-foreground">No data yet</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Total applications</span>
+                <span className="font-medium">{pipeline.totalApplications}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">This week</span>
+                <span className="font-medium">{pipeline.thisWeekApplications}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">This month</span>
+                <span className="font-medium">{pipeline.thisMonthApplications}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Applications by Source</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              {pipeline.bySource.map(({ sourceId, sourceName, count }) => (
+                <div key={sourceId} className="flex items-center justify-between">
+                  <span className="text-sm">{sourceName}</span>
+                  <Badge variant="secondary">{count}</Badge>
+                </div>
+              ))}
+              {pipeline.bySource.length === 0 && (
+                <p className="text-sm text-muted-foreground">No data yet</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

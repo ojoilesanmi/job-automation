@@ -8,33 +8,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Briefcase, MapPin, DollarSign, Search, ExternalLink } from "lucide-react";
+import { Briefcase, MapPin, DollarSign, Search, ExternalLink, Filter } from "lucide-react";
 
 interface Job {
   id: string;
-  externalJobId: string;
-  source: string;
   title: string;
   company: string;
-  companyWebsite: string;
-  description: string;
   location: string;
   country: string;
   salaryMin: number;
   salaryMax: number;
-  currency: string;
   remoteType: string;
-  relocationAvailable: boolean;
-  visaSponsorshipSignal: boolean;
   seniority: string;
   requiredSkills: string;
-  preferredSkills: string;
-  experienceYears: number;
   employmentType: string;
   applicationUrl: string;
-  atsProvider: string;
-  datePosted: string;
-  dateDiscovered: string;
+  source: string;
 }
 
 interface JobsResponse {
@@ -44,25 +33,34 @@ interface JobsResponse {
   currentPage: number;
 }
 
+const REMOTE_OPTIONS = ["", "full_remote", "hybrid", "onsite"];
+const SENIORITY_OPTIONS = ["", "junior", "mid", "senior", "lead", "executive"];
+const COUNTRY_OPTIONS = ["", "US", "UK", "Germany", "Canada", "Nigeria", "Remote"];
+
 export default function JobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [totalElements, setTotalElements] = useState(0);
+  const [showFilters, setShowFilters] = useState(false);
+  const [remoteFilter, setRemoteFilter] = useState("");
+  const [seniorityFilter, setSeniorityFilter] = useState("");
+  const [countryFilter, setCountryFilter] = useState("");
 
   useEffect(() => {
     api.get<JobsResponse>("/api/v1/jobs")
-      .then((data) => {
-        setJobs(data.jobs);
-        setTotalElements(data.totalElements);
-      })
+      .then((data) => { setJobs(data.jobs); setTotalElements(data.totalElements); })
       .catch(() => setJobs([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = jobs.filter((j) =>
-    !search || j.title.toLowerCase().includes(search.toLowerCase()) || j.company.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = jobs.filter((j) => {
+    const matchSearch = !search || j.title.toLowerCase().includes(search.toLowerCase()) || j.company.toLowerCase().includes(search.toLowerCase());
+    const matchRemote = !remoteFilter || j.remoteType === remoteFilter;
+    const matchSeniority = !seniorityFilter || j.seniority === seniorityFilter;
+    const matchCountry = !countryFilter || j.country === countryFilter;
+    return matchSearch && matchRemote && matchSeniority && matchCountry;
+  });
 
   if (loading) {
     return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
@@ -75,10 +73,41 @@ export default function JobsPage() {
         <p className="text-sm text-muted-foreground">{totalElements} jobs found</p>
       </div>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search jobs..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search jobs..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
+          <Filter className="mr-2 h-4 w-4" />Filters
+        </Button>
       </div>
+
+      {showFilters && (
+        <div className="flex flex-wrap gap-3 rounded-lg border bg-card p-4">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Remote</label>
+            <select className="rounded-md border bg-background px-3 py-1.5 text-sm" value={remoteFilter} onChange={(e) => setRemoteFilter(e.target.value)}>
+              {REMOTE_OPTIONS.map((o) => <option key={o} value={o}>{o || "All"}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Seniority</label>
+            <select className="rounded-md border bg-background px-3 py-1.5 text-sm" value={seniorityFilter} onChange={(e) => setSeniorityFilter(e.target.value)}>
+              {SENIORITY_OPTIONS.map((o) => <option key={o} value={o}>{o || "All"}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Country</label>
+            <select className="rounded-md border bg-background px-3 py-1.5 text-sm" value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)}>
+              {COUNTRY_OPTIONS.map((o) => <option key={o} value={o}>{o || "All"}</option>)}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <Button variant="ghost" size="sm" onClick={() => { setRemoteFilter(""); setSeniorityFilter(""); setCountryFilter(""); }}>Clear</Button>
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-muted-foreground">No jobs found. Run a job discovery worker to populate the feed.</CardContent></Card>
@@ -99,9 +128,7 @@ export default function JobsPage() {
                       </div>
                       {job.applicationUrl && (
                         <a href={job.applicationUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon">
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
+                          <Button variant="ghost" size="icon"><ExternalLink className="h-4 w-4" /></Button>
                         </a>
                       )}
                     </div>

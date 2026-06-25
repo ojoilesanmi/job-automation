@@ -32,4 +32,10 @@ public class DashboardController {
         );
         return ResponseEntity.ok(BaseResponse.success(stats));
     }
+
+    @GetMapping("/pipeline")
+    public ResponseEntity<BaseResponse<PipelineReportResponse>> getPipeline() {
+        return ResponseEntity.ok(BaseResponse.success(
+                dashboardService.getPipelineReport(SecurityUtils.getCurrentUserId())));
+    }
 }
