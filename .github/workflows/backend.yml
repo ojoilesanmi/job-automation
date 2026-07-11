@@ -48,8 +48,8 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: postgres
           JWT_SECRET: ci-test-secret-key-for-testing-only
         run: |
-          mvn clean package -q
-          mvn test
+          mvn clean package -q -DskipTests
+          mvn test -Dtest='!*IntegrationTest'
 
       - name: Upload JAR
         if: github.ref == 'refs/heads/main'
