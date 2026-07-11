@@ -92,15 +92,24 @@ export default function MatchesPage() {
     setActionLoading(id);
     try {
       await api.post(`/api/v1/matches/${id}/approve`);
+      await api.post(`/api/v1/learning/feedback/${id}`, {
+        feedbackType: "approved",
+        reason: "User approved"
+      });
       loadMatches();
     } catch {}
     setActionLoading(null);
   };
 
   const reject = async (id: string) => {
+    const reason = prompt("Why are you rejecting this match? (optional)");
     setActionLoading(id);
     try {
       await api.post(`/api/v1/matches/${id}/reject`);
+      await api.post(`/api/v1/learning/feedback/${id}`, {
+        feedbackType: "rejected",
+        reason: reason || "User rejected"
+      });
       loadMatches();
     } catch {}
     setActionLoading(null);

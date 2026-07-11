@@ -1,6 +1,7 @@
 package com.jobagent.controller;
 
 import com.jobagent.dto.*;
+import com.jobagent.security.RequirePermission;
 import com.jobagent.security.SecurityUtils;
 import com.jobagent.service.DashboardService;
 import lombok.RequiredArgsConstructor;
@@ -34,8 +35,16 @@ public class DashboardController {
     }
 
     @GetMapping("/pipeline")
+    @RequirePermission("dashboard:read")
     public ResponseEntity<BaseResponse<PipelineReportResponse>> getPipeline() {
         return ResponseEntity.ok(BaseResponse.success(
                 dashboardService.getPipelineReport(SecurityUtils.getCurrentUserId())));
+    }
+
+    @GetMapping("/reports")
+    @RequirePermission("dashboard:read")
+    public ResponseEntity<BaseResponse<DetailedReportResponse>> getDetailedReport() {
+        return ResponseEntity.ok(BaseResponse.success(
+                dashboardService.getDetailedReport(SecurityUtils.getCurrentUserId())));
     }
 }

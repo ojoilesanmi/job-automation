@@ -3,6 +3,7 @@ package com.jobagent.controller;
 import com.jobagent.dto.*;
 import com.jobagent.security.RequirePermission;
 import com.jobagent.security.SecurityUtils;
+import com.jobagent.service.ProfileDataService;
 import com.jobagent.service.ProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class ProfileController {
 
     private final ProfileService profileService;
+    private final ProfileDataService profileDataService;
 
     @GetMapping("/profile")
     @RequirePermission("profile:read")
@@ -88,5 +90,47 @@ public class ProfileController {
     public ResponseEntity<BaseResponse<Void>> deleteCv(@PathVariable UUID id) {
         profileService.deleteCv(SecurityUtils.getCurrentUserId(), id);
         return ResponseEntity.ok(BaseResponse.success("CV deleted", null));
+    }
+
+    @GetMapping("/education")
+    @RequirePermission("profile:read")
+    public ResponseEntity<BaseResponse<List<EducationResponse>>> getEducation() {
+        return ResponseEntity.ok(BaseResponse.success(
+                profileDataService.getEducation(SecurityUtils.getCurrentUserId())));
+    }
+
+    @PostMapping("/education")
+    @RequirePermission("profile:write")
+    public ResponseEntity<BaseResponse<List<EducationResponse>>> saveEducation(@RequestBody SaveEducationRequest request) {
+        return ResponseEntity.ok(BaseResponse.success("Education saved",
+                profileDataService.saveEducation(SecurityUtils.getCurrentUserId(), request)));
+    }
+
+    @GetMapping("/certifications")
+    @RequirePermission("profile:read")
+    public ResponseEntity<BaseResponse<List<CertificationResponse>>> getCertifications() {
+        return ResponseEntity.ok(BaseResponse.success(
+                profileDataService.getCertifications(SecurityUtils.getCurrentUserId())));
+    }
+
+    @PostMapping("/certifications")
+    @RequirePermission("profile:write")
+    public ResponseEntity<BaseResponse<List<CertificationResponse>>> saveCertifications(@RequestBody SaveCertificationRequest request) {
+        return ResponseEntity.ok(BaseResponse.success("Certifications saved",
+                profileDataService.saveCertifications(SecurityUtils.getCurrentUserId(), request)));
+    }
+
+    @GetMapping("/links")
+    @RequirePermission("profile:read")
+    public ResponseEntity<BaseResponse<List<ProfileLinkResponse>>> getLinks() {
+        return ResponseEntity.ok(BaseResponse.success(
+                profileDataService.getLinks(SecurityUtils.getCurrentUserId())));
+    }
+
+    @PostMapping("/links")
+    @RequirePermission("profile:write")
+    public ResponseEntity<BaseResponse<List<ProfileLinkResponse>>> saveLinks(@RequestBody SaveLinksRequest request) {
+        return ResponseEntity.ok(BaseResponse.success("Links saved",
+                profileDataService.saveLinks(SecurityUtils.getCurrentUserId(), request)));
     }
 }

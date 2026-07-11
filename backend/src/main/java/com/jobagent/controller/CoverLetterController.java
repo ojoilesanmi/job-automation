@@ -4,6 +4,7 @@ import com.jobagent.dto.*;
 import com.jobagent.security.RequirePermission;
 import com.jobagent.security.SecurityUtils;
 import com.jobagent.service.CoverLetterService;
+import com.jobagent.service.PdfExportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,7 @@ import java.util.UUID;
 public class CoverLetterController {
 
     private final CoverLetterService coverLetterService;
+    private final PdfExportService pdfExportService;
 
     @PostMapping("/jobs/{jobId}/cover-letters/generate")
     @RequirePermission("cover_letter:write")
@@ -73,15 +75,12 @@ public class CoverLetterController {
             @RequestParam(defaultValue = "text") String format) {
         CoverLetterResponse cl = coverLetterService.getCoverLetterById(SecurityUtils.getCurrentUserId(), id);
         String content = cl.content();
-        String title = cl.jobTitle() != null ? cl.jobTitle() : "Cover Letter";
 
         if ("pdf".equals(format)) {
-            String html = "<html><body><h1>" + title + "</h1><p>" +
-                    content.replace("\n", "</p><p>") + "</p></body></html>";
-            byte[] pdfBytes = html.getBytes();
+            byte[] pdfBytes = pdfExportService.generatePdf(content);
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cover-letter-" + id + ".html\"")
-                    .contentType(MediaType.TEXT_HTML)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cover-letter-" + id + ".pdf\"")
+                    .contentType(MediaType.APPLICATION_PDF)
                     .body(pdfBytes);
         }
 

@@ -4,6 +4,7 @@ import com.jobagent.model.Job;
 import com.jobagent.model.JobSource;
 import com.jobagent.repository.JobRepository;
 import com.jobagent.repository.JobSourceRepository;
+import com.jobagent.service.QueueProducerService;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -27,8 +28,12 @@ public class JobDiscoveryService {
     private final JobRepository jobRepository;
     private final List<JobSourceConnector> connectors;
     private final MeterRegistry meterRegistry;
+    private final JobSourceHealthMonitor healthMonitor;
+    private final QueueProducerService queueProducerService;
 
     private static final int MAX_JOBS_PER_SOURCE = 50;
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 1000;
 
     @Scheduled(fixedDelayString = "${app.discovery.interval:3600000}", initialDelay = 60000)
     public void runDiscovery() {
@@ -51,11 +56,21 @@ public class JobDiscoveryService {
             }
 
             try {
-                List<Job> fetched = connector.fetchJobs(source, MAX_JOBS_PER_SOURCE);
+                List<Job> fetched = RetryableJobFetch.executeWithRetry(
+                        () -> connector.fetchJobs(source, MAX_JOBS_PER_SOURCE),
+                        MAX_RETRIES, RETRY_DELAY_MS,
+                        "fetchJobs:" + source.getSourceType());
                 int saved = saveNewJobs(fetched);
                 totalNew += saved;
+                if (saved > 0) {
+                    for (Job job : fetched.stream().limit(saved).toList()) {
+                        queueProducerService.sendJobMatching(job.getId());
+                    }
+                }
+                healthMonitor.recordSuccess(source.getSourceType());
                 log.info("Source '{}': fetched {}, saved {} new", source.getName(), fetched.size(), saved);
             } catch (Exception e) {
+                healthMonitor.recordFailure(source.getSourceType());
                 log.error("Discovery failed for source '{}': {}", source.getName(), e.getMessage());
             }
         }
@@ -75,10 +90,16 @@ public class JobDiscoveryService {
         int saved = 0;
         for (Job job : jobs) {
             try {
-                boolean exists = jobRepository.existsBySourceIdAndExternalJobId(
-                        job.getSource().getId(), job.getExternalJobId());
+                boolean exists = RetryableJobFetch.executeWithRetry(
+                        () -> jobRepository.existsBySourceIdAndExternalJobId(
+                                job.getSource().getId(), job.getExternalJobId()),
+                        2, RETRY_DELAY_MS,
+                        "existsCheck:" + job.getExternalJobId());
                 if (!exists) {
-                    jobRepository.save(job);
+                    RetryableJobFetch.executeWithRetry(
+                            () -> jobRepository.save(job),
+                            2, RETRY_DELAY_MS,
+                            "saveJob:" + job.getExternalJobId());
                     saved++;
                 }
             } catch (Exception e) {

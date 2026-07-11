@@ -22,6 +22,15 @@ TONE_INSTRUCTIONS = {
 async def generate_cover_letter(request: CoverLetterRequest) -> CoverLetterResponse:
     logger.info("cover_letter_start", job_title=request.job_title, company=request.job_company)
 
+    from app.services.injection_guard import check_injection
+    from app.models.schemas import InjectionCheckRequest
+    guard_result = check_injection(InjectionCheckRequest(text=request.job_description))
+    if not guard_result.is_safe:
+        logger.warning(f"Injection detected in job description: {guard_result.flagged_patterns}")
+        safe_description = guard_result.sanitized_text
+    else:
+        safe_description = request.job_description
+
     if not client:
         logger.info("cover_letter_fallback_template")
         return _template_cover_letter(request)
@@ -31,7 +40,7 @@ async def generate_cover_letter(request: CoverLetterRequest) -> CoverLetterRespo
             model=settings.OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": _system_prompt(request.tone)},
-                {"role": "user", "content": _build_prompt(request)},
+                {"role": "user", "content": _build_prompt(request, safe_description)},
             ],
             temperature=settings.OPENAI_TEMPERATURE,
             max_tokens=settings.OPENAI_MAX_TOKENS,
@@ -83,7 +92,7 @@ RULES:
 6. Structure: Opening, 1-2 body paragraphs, closing"""
 
 
-def _build_prompt(request: CoverLetterRequest) -> str:
+def _build_prompt(request: CoverLetterRequest, safe_description: str) -> str:
     return f"""Write a tailored cover letter.
 
 CANDIDATE:
@@ -98,7 +107,7 @@ CV (excerpt):
 JOB:
 - Title: {request.job_title}
 - Company: {request.job_company}
-- Description: {request.job_description[:2000]}
+- Description: {safe_description[:2000]}
 
 MATCHED: {', '.join(request.matched_skills[:5])}
 MISSING: {', '.join(request.missing_skills[:5])}

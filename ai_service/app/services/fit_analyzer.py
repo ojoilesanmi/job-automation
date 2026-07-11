@@ -15,6 +15,15 @@ client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY) if settings.OPENAI_API_KEY
 async def analyze_fit(request: FitAnalysisRequest) -> FitAnalysisResponse:
     logger.info("fit_analysis_start", job_title=request.job_title, company=request.job_company)
 
+    from app.services.injection_guard import check_injection
+    from app.models.schemas import InjectionCheckRequest
+    guard_result = check_injection(InjectionCheckRequest(text=request.job_description))
+    if not guard_result.is_safe:
+        logger.warning(f"Injection detected in job description: {guard_result.flagged_patterns}")
+        safe_description = guard_result.sanitized_text
+    else:
+        safe_description = request.job_description
+
     if not client:
         logger.info("fit_analysis_fallback_rule_based")
         return _rule_based_fit(request)
@@ -24,7 +33,7 @@ async def analyze_fit(request: FitAnalysisRequest) -> FitAnalysisResponse:
             model=settings.OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": "You are a job-matching analyst. Analyze fit factually. Never hallucinate skills not in the profile. Respond only in JSON."},
-                {"role": "user", "content": _build_prompt(request)},
+                {"role": "user", "content": _build_prompt(request, safe_description)},
             ],
             temperature=0.3,
             max_tokens=1000,
@@ -56,7 +65,7 @@ async def analyze_fit(request: FitAnalysisRequest) -> FitAnalysisResponse:
         return _rule_based_fit(request)
 
 
-def _build_prompt(request: FitAnalysisRequest) -> str:
+def _build_prompt(request: FitAnalysisRequest, safe_description: str) -> str:
     return f"""Analyze the fit between this candidate and job.
 
 CANDIDATE:
@@ -70,7 +79,7 @@ JOB:
 - Company: {request.job_company}
 - Required Skills: {', '.join(request.job_required_skills)}
 - Preferred Skills: {', '.join(request.job_preferred_skills)}
-- Description: {request.job_description[:2000]}
+- Description: {safe_description[:2000]}
 
 Respond in this exact JSON format:
 {{"fit_score": 0-100, "matched_skills": [], "missing_skills": [], "reasons_to_apply": [], "reasons_to_skip": [], "risk_flags": [], "explanation": ""}}"""

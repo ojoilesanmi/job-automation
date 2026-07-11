@@ -16,6 +16,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
 
     boolean existsBySourceIdAndExternalJobId(UUID sourceId, String externalJobId);
 
+    Optional<Job> findByApplicationUrl(String applicationUrl);
+
     @Query(value = "SELECT j.* FROM jobs j WHERE " +
            "(:company IS NULL OR LOWER(j.company) LIKE LOWER(CONCAT('%', :company, '%'))) " +
            "AND (:country IS NULL OR LOWER(j.country) = LOWER(:country)) " +

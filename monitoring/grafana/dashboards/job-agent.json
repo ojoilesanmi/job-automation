@@ -1,0 +1,120 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Job Agent Platform",
+    "tags": ["jobagent"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Requests",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(http_server_requests_seconds_count[5m])",
+            "legendFormat": "{{method}} {{uri}}"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "API Response Time",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_server_requests_seconds_bucket[5m]))",
+            "legendFormat": "p95 {{uri}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Jobs Discovered",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(jobagent_discovery_jobs_found_total[1h]))",
+            "legendFormat": "Jobs/hour"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cover Letter Generation Time",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(jobagent_cover_letters_generation_time_seconds_bucket[5m]))",
+            "legendFormat": "p95 generation time"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Applications Submitted",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
+        "targets": [
+          {
+            "expr": "sum(rate(jobagent_applications_submitted_total[1h]))",
+            "legendFormat": "Apps/hour"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Source Health",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 8 },
+        "targets": [
+          {
+            "expr": "sum(jobagent_source_health)",
+            "legendFormat": "Healthy sources"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Consecutive Failures by Source",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "targets": [
+          {
+            "expr": "jobagent_source_consecutive_failures",
+            "legendFormat": "{{source}}"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "AI Service Requests",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+        "targets": [
+          {
+            "expr": "rate(ai_requests_total[5m])",
+            "legendFormat": "{{endpoint}} {{status}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "AI Service Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(ai_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95 {{endpoint}}"
+          }
+        ]
+      }
+    ],
+    "time": { "from": "now-1h", "to": "now" },
+    "refresh": "30s"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "job-agent-playwright",
+  "version": "1.0.0",
+  "description": "Playwright submission automation",
+  "scripts": {
+    "submit": "node submit.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}

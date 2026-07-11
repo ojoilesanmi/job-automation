@@ -8,4 +8,6 @@ import java.util.UUID;
 
 public interface JobSourceRepository extends JpaRepository<JobSource, UUID> {
     List<JobSource> findByEnabledTrue();
+
+    List<JobSource> findBySourceType(String sourceType);
 }

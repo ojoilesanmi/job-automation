@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jobagent_test
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+app:
+  jwt:
+    secret: test-secret-key-for-testing-only
+    expiration: 86400000
+  cors:
+    allowed-origins: http://localhost:3002
+  storage:
+    type: local
+    local:
+      base-path: /tmp/jobagent-test-uploads
+
+logging:
+  level:
+    root: WARN
+    com.jobagent: INFO

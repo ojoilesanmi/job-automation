@@ -1,234 +1,103 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { parseSkills } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X, Upload, FileText, Check, Trash2 } from "lucide-react";
-
-interface Experience {
-  id: string;
-  company: string;
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  achievements: string;
-}
-
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  url: string;
-  technologies: string;
-}
-
-interface Skill {
-  id: string;
-  skillName: string;
-  skillType: string;
-  proficiency: string;
-  yearsUsed: number | null;
-}
-
-interface CvDocument {
-  id: string;
-  fileName: string;
-  fileUrl: string;
-  parsedText: string | null;
-  versionName: string | null;
-  isDefault: boolean;
-  createdAt: string;
-}
+import { Briefcase, GraduationCap, Award, Link2, Plus, Trash2, Upload } from "lucide-react";
 
 interface Profile {
-  id: string;
   headline: string;
   summary: string;
   location: string;
   yearsOfExperience: number;
   primaryRole: string;
-  skills: Skill[];
-  experiences: Experience[];
-  projects: Project[];
-  createdAt: string;
-  updatedAt: string;
 }
 
+interface Skill { id: string; skillName: string; skillType: string; }
+interface Experience { id: string; company: string; title: string; startDate: string; endDate: string; description: string; }
+interface Project { id: string; name: string; description: string; technologies: string; url: string; }
+interface Education { id: string; institution: string; degree: string; fieldOfStudy: string; startDate: string; endDate: string; description: string; }
+interface Certification { id: string; name: string; issuingOrg: string; issueDate: string; expiryDate: string; credentialUrl: string; }
+interface ProfileLink { id: string; linkType: string; url: string; label: string; }
+interface CvDoc { id: string; fileName: string; isDefault: boolean; createdAt: string; }
+
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile>({ headline: "", summary: "", location: "", yearsOfExperience: 0, primaryRole: "" });
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [experience, setExperience] = useState<Experience[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [education, setEducation] = useState<Education[]>([]);
+  const [certifications, setCertifications] = useState<Certification[]>([]);
+  const [links, setLinks] = useState<ProfileLink[]>([]);
+  const [cvDocs, setCvDocs] = useState<CvDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [newSkill, setNewSkill] = useState("");
-  const [saved, setSaved] = useState(false);
-  const savedTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const [cvs, setCvs] = useState<CvDocument[]>([]);
-  const [cvUploading, setCvUploading] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [expForm, setExpForm] = useState({ company: "", title: "", description: "", startDate: "", endDate: "", achievements: "" });
-  const [projForm, setProjForm] = useState({ name: "", description: "", url: "", technologies: "" });
+  const [newExp, setNewExp] = useState<Partial<Experience>>({});
+  const [newProject, setNewProject] = useState<Partial<Project>>({});
+  const [newEdu, setNewEdu] = useState<Partial<Education>>({});
+  const [newCert, setNewCert] = useState<Partial<Certification>>({});
+  const [newLink, setNewLink] = useState<Partial<ProfileLink>>({});
 
   useEffect(() => {
     Promise.all([
       api.get<Profile>("/api/v1/profile").catch(() => null),
-      api.get<CvDocument[]>("/api/v1/cvs").catch(() => []),
-    ]).then(([p, c]) => {
-      setProfile(p);
-      setCvs(c);
+      api.get<{ skills: Skill[] }>("/api/v1/profile/skills").catch(() => ({ skills: [] })),
+      api.get<{ experiences: Experience[] }>("/api/v1/profile/experience").catch(() => ({ experiences: [] })),
+      api.get<{ projects: Project[] }>("/api/v1/profile/projects").catch(() => ({ projects: [] })),
+      api.get<Education[]>("/api/v1/profile/education").catch(() => []),
+      api.get<Certification[]>("/api/v1/profile/certifications").catch(() => []),
+      api.get<ProfileLink[]>("/api/v1/profile/links").catch(() => []),
+      api.get<{ cvDocuments: CvDoc[] }>("/api/v1/cvs").catch(() => ({ cvDocuments: [] })),
+    ]).then(([p, s, e, pr, ed, ce, li, cv]) => {
+      if (p) setProfile(p);
+      setSkills(s?.skills || []);
+      setExperience(e?.experiences || []);
+      setProjects(pr?.projects || []);
+      setEducation(Array.isArray(ed) ? ed : []);
+      setCertifications(Array.isArray(ce) ? ce : []);
+      setLinks(Array.isArray(li) ? li : []);
+      setCvDocs(cv?.cvDocuments || []);
     }).finally(() => setLoading(false));
   }, []);
 
-  const refreshCvs = () => api.get<CvDocument[]>("/api/v1/cvs").then(setCvs).catch(() => {});
-
-  const handleFileUpload = useCallback(async (file: File) => {
-    const allowed = [".pdf", ".doc", ".docx", ".txt"];
-    const ext = "." + file.name.split(".").pop()?.toLowerCase();
-    if (!allowed.includes(ext)) return;
-    setCvUploading(true);
-    try {
-      await api.upload<CvDocument>("/api/v1/cvs/upload", file);
-      await refreshCvs();
-    } catch {}
-    setCvUploading(false);
-  }, []);
-
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileUpload(file);
-    e.target.value = "";
-  };
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
-  };
-
-  const setDefaultCv = async (id: string) => {
-    await api.put(`/api/v1/cvs/${id}/default`);
-    await refreshCvs();
-  };
-
-  const deleteCv = async (id: string) => {
-    await api.del(`/api/v1/cvs/${id}`);
-    await refreshCvs();
-  };
-
   const saveProfile = async () => {
-    if (!profile) return;
     setSaving(true);
-    setSaved(false);
     try {
-      const updated = await api.put<Profile>("/api/v1/profile", profile);
-      setProfile(updated);
-      await api.put("/api/v1/profile/skills", {
-        skills: profile.skills.map((s) => ({
-          skillName: s.skillName,
-          skillType: s.skillType || "technical",
-          proficiency: s.proficiency || "intermediate",
-          yearsUsed: s.yearsUsed || null,
-        })),
-      });
-      setSaved(true);
-      if (savedTimeout.current) clearTimeout(savedTimeout.current);
-      savedTimeout.current = setTimeout(() => setSaved(false), 2000);
+      await api.put("/api/v1/profile", profile);
+      if (skills.length > 0) await api.put("/api/v1/profile/skills", { skills: skills.map((s) => ({ skillName: s.skillName, skillType: s.skillType })) });
+      if (experience.length > 0) await api.put("/api/v1/profile/experience", { experience });
+      if (projects.length > 0) await api.put("/api/v1/profile/projects", { projects });
+      if (education.length > 0) await api.post("/api/v1/profile/education", { education });
+      if (certifications.length > 0) await api.post("/api/v1/profile/certifications", { certifications });
+      if (links.length > 0) await api.post("/api/v1/profile/links", { links });
     } catch {}
     setSaving(false);
   };
 
-  const addSkill = () => {
-    if (newSkill.trim() && profile) {
-      setProfile({
-        ...profile,
-        skills: [...profile.skills, { id: "", skillName: newSkill.trim(), skillType: "technical", proficiency: "intermediate", yearsUsed: null }],
-      });
-      setNewSkill("");
-    }
-  };
-
-  const removeSkill = (skillName: string) => {
-    if (!profile) return;
-    setProfile({ ...profile, skills: profile.skills.filter((s) => s.skillName !== skillName) });
-  };
-
-  const saveExperience = async () => {
-    if (!profile) return;
-    const allExps = [
-      ...profile.experiences.map((e) => ({
-        company: e.company, title: e.title, description: e.description || null,
-        startDate: e.startDate || null, endDate: e.endDate || null, achievements: e.achievements || null,
-      })),
-      ...(expForm.company && expForm.title ? [{
-        company: expForm.company, title: expForm.title, description: expForm.description || null,
-        startDate: expForm.startDate || null, endDate: expForm.endDate || null, achievements: expForm.achievements || null,
-      }] : []),
-    ];
-    if (allExps.length === 0) return;
+  const uploadCv = async (file: File) => {
     try {
-      await api.put("/api/v1/profile/experience", { experiences: allExps });
-      const updated = await api.get<Profile>("/api/v1/profile");
-      setProfile(updated);
-      setExpForm({ company: "", title: "", description: "", startDate: "", endDate: "", achievements: "" });
+      const result = await api.upload<{ id: string; fileName: string }>("/api/v1/cvs/upload", file);
+      setCvDocs((prev) => [...prev, { id: result.id, fileName: result.fileName, isDefault: false, createdAt: new Date().toISOString() }]);
     } catch {}
   };
 
-  const removeExperience = async (index: number) => {
-    if (!profile) return;
-    const allExps = profile.experiences
-      .filter((_, i) => i !== index)
-      .map((e) => ({
-        company: e.company, title: e.title, description: e.description || null,
-        startDate: e.startDate || null, endDate: e.endDate || null, achievements: e.achievements || null,
-      }));
+  const setDefaultCv = async (id: string) => {
     try {
-      await api.put("/api/v1/profile/experience", { experiences: allExps });
-      const updated = await api.get<Profile>("/api/v1/profile");
-      setProfile(updated);
+      await api.put(`/api/v1/cvs/${id}/default`);
+      setCvDocs((prev) => prev.map((cv) => ({ ...cv, isDefault: cv.id === id })));
     } catch {}
   };
 
-  const saveProject = async () => {
-    if (!profile) return;
-    const allProjs = [
-      ...profile.projects.map((p) => ({
-        name: p.name, description: p.description || null,
-        technologies: p.technologies || null, url: p.url || null,
-      })),
-      ...(projForm.name ? [{
-        name: projForm.name, description: projForm.description || null,
-        technologies: projForm.technologies || null, url: projForm.url || null,
-      }] : []),
-    ];
-    if (allProjs.length === 0) return;
+  const deleteCv = async (id: string) => {
     try {
-      await api.put("/api/v1/profile/projects", { projects: allProjs });
-      const updated = await api.get<Profile>("/api/v1/profile");
-      setProfile(updated);
-      setProjForm({ name: "", description: "", url: "", technologies: "" });
-    } catch {}
-  };
-
-  const removeProject = async (index: number) => {
-    if (!profile) return;
-    const allProjs = profile.projects
-      .filter((_, i) => i !== index)
-      .map((p) => ({
-        name: p.name, description: p.description || null,
-        technologies: p.technologies || null, url: p.url || null,
-      }));
-    try {
-      await api.put("/api/v1/profile/projects", { projects: allProjs });
-      const updated = await api.get<Profile>("/api/v1/profile");
-      setProfile(updated);
+      await api.del(`/api/v1/cvs/${id}`);
+      setCvDocs((prev) => prev.filter((cv) => cv.id !== id));
     } catch {}
   };
 
@@ -236,208 +105,171 @@ export default function ProfilePage() {
     return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
   }
 
-  if (!profile) {
-    return <div className="flex h-64 items-center justify-center text-muted-foreground">Failed to load profile.</div>;
-  }
+  const LINK_TYPES = ["github", "linkedin", "portfolio", "twitter", "other"];
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Profile</h1>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Professional information</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Headline</Label>
-              <Input value={profile.headline ?? ""} onChange={(e) => setProfile({ ...profile, headline: e.target.value })} placeholder="e.g. Senior Software Engineer" />
-            </div>
-            <div className="space-y-2">
-              <Label>Primary role</Label>
-              <Input value={profile.primaryRole ?? ""} onChange={(e) => setProfile({ ...profile, primaryRole: e.target.value })} placeholder="e.g. Backend Developer" />
-            </div>
-            <div className="space-y-2">
-              <Label>Location</Label>
-              <Input value={profile.location ?? ""} onChange={(e) => setProfile({ ...profile, location: e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Years of experience</Label>
-              <Input type="number" value={profile.yearsOfExperience ?? 0} onChange={(e) => setProfile({ ...profile, yearsOfExperience: +e.target.value })} />
-            </div>
-            <div className="space-y-2">
-              <Label>Summary</Label>
-              <Textarea rows={4} value={profile.summary ?? ""} onChange={(e) => setProfile({ ...profile, summary: e.target.value })} />
-            </div>
-            <Button onClick={saveProfile} disabled={saving}>
-              {saving ? (
-                <><span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />Saving...</>
-              ) : saved ? (
-                <><Check className="mr-1.5 h-4 w-4" />Saved</>
-              ) : "Save profile"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle>Skills</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input placeholder="Add a skill" value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addSkill()} />
-                <Button size="icon" onClick={addSkill}><Plus className="h-4 w-4" /></Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {profile.skills.map((s) => (
-                  <Badge key={s.skillName} variant="secondary" className="gap-1">
-                    {s.skillName}
-                    <button onClick={() => removeSkill(s.skillName)}><X className="h-3 w-3" /></button>
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Experience</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {profile.experiences.map((exp, i) => (
-                <div key={exp.id || i} className="flex items-start justify-between rounded-md border p-3">
-                  <div>
-                    <p className="font-medium">{exp.title}</p>
-                    <p className="text-sm text-muted-foreground">{exp.company}</p>
-                    {exp.startDate && <p className="text-xs text-muted-foreground">{exp.startDate} – {exp.endDate || "Present"}</p>}
-                    {exp.description && <p className="mt-1 text-sm">{exp.description}</p>}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => removeExperience(i)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-              <div className="border-t pt-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Add experience</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="Company" value={expForm.company} onChange={(e) => setExpForm({ ...expForm, company: e.target.value })} />
-                  <Input placeholder="Title" value={expForm.title} onChange={(e) => setExpForm({ ...expForm, title: e.target.value })} />
-                  <Input placeholder="Start date (YYYY-MM)" value={expForm.startDate} onChange={(e) => setExpForm({ ...expForm, startDate: e.target.value })} />
-                  <Input placeholder="End date (YYYY-MM)" value={expForm.endDate} onChange={(e) => setExpForm({ ...expForm, endDate: e.target.value })} />
-                </div>
-                <Textarea placeholder="Description" rows={2} value={expForm.description} onChange={(e) => setExpForm({ ...expForm, description: e.target.value })} />
-                <Button size="sm" onClick={saveExperience} disabled={!expForm.company || !expForm.title}>
-                  <Plus className="mr-1 h-3 w-3" />Add experience
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>Projects</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              {profile.projects.map((proj, i) => (
-                <div key={proj.id || i} className="flex items-start justify-between rounded-md border p-3">
-                  <div>
-                    <p className="font-medium">{proj.name}</p>
-                    {proj.description && <p className="text-sm">{proj.description}</p>}
-                    {proj.technologies && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {proj.technologies.split(",").map((t) => (
-                          <Badge key={t.trim()} variant="outline" className="text-xs">{t.trim()}</Badge>
-                        ))}
-                      </div>
-                    )}
-                    {proj.url && <a href={proj.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">{proj.url}</a>}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => removeProject(i)}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
-              <div className="border-t pt-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Add project</p>
-                <Input placeholder="Project name" value={projForm.name} onChange={(e) => setProjForm({ ...projForm, name: e.target.value })} />
-                <Textarea placeholder="Description" rows={2} value={projForm.description} onChange={(e) => setProjForm({ ...projForm, description: e.target.value })} />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="Technologies (comma-separated)" value={projForm.technologies} onChange={(e) => setProjForm({ ...projForm, technologies: e.target.value })} />
-                  <Input placeholder="URL" value={projForm.url} onChange={(e) => setProjForm({ ...projForm, url: e.target.value })} />
-                </div>
-                <Button size="sm" onClick={saveProject} disabled={!projForm.name}>
-                  <Plus className="mr-1 h-3 w-3" />Add project
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle>CVs</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.doc,.docx,.txt"
-                className="hidden"
-                onChange={onFileChange}
-              />
-
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={onDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-                  dragOver
-                    ? "border-primary bg-primary/5"
-                    : "border-muted-foreground/25 hover:border-primary/50"
-                }`}
-              >
-                {cvUploading ? (
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                ) : (
-                  <>
-                    <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
-                    <p className="text-sm font-medium">
-                      Drop your CV here or click to browse
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      PDF, DOC, DOCX, or TXT (max 10 MB)
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {cvs.length > 0 && (
-                <div className="space-y-2 pt-2">
-                  {cvs.map((cv) => (
-                    <div key={cv.id} className="flex items-center justify-between rounded-md border p-3">
-                      <div className="flex min-w-0 flex-1 items-center gap-2">
-                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{cv.fileName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {cv.isDefault && <Badge variant="default" className="mr-2">Default</Badge>}
-                            {new Date(cv.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        {!cv.isDefault && (
-                          <Button variant="outline" size="sm" onClick={() => setDefaultCv(cv.id)}>
-                            Set default
-                          </Button>
-                        )}
-                        <Button variant="destructive" size="sm" onClick={() => deleteCv(cv.id)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {cvs.length === 0 && (
-                <p className="text-sm text-muted-foreground">No CVs uploaded yet.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Profile</h1>
+        <Button onClick={saveProfile} disabled={saving}>{saving ? "Saving..." : "Save all"}</Button>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>CV Documents</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-3">
+            {cvDocs.map((cv) => (
+              <div key={cv.id} className="flex items-center gap-2 rounded-lg border p-3">
+                <span className="text-sm font-medium">{cv.fileName}</span>
+                {cv.isDefault && <Badge>Default</Badge>}
+                {!cv.isDefault && <Button size="sm" variant="outline" onClick={() => setDefaultCv(cv.id)}>Set default</Button>}
+                <Button size="sm" variant="ghost" onClick={() => deleteCv(cv.id)}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            ))}
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground hover:bg-accent/50">
+            <Upload className="h-4 w-4" />Upload CV (PDF/DOCX)
+            <input type="file" className="hidden" accept=".pdf,.docx" onChange={(e) => e.target.files?.[0] && uploadCv(e.target.files[0])} />
+          </label>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Basic Info</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1"><label className="text-xs font-medium">Headline</label><Input value={profile.headline} onChange={(e) => setProfile({ ...profile, headline: e.target.value })} /></div>
+          <div className="space-y-1"><label className="text-xs font-medium">Primary role</label><Input value={profile.primaryRole} onChange={(e) => setProfile({ ...profile, primaryRole: e.target.value })} /></div>
+          <div className="space-y-1"><label className="text-xs font-medium">Location</label><Input value={profile.location} onChange={(e) => setProfile({ ...profile, location: e.target.value })} /></div>
+          <div className="space-y-1"><label className="text-xs font-medium">Years of experience</label><Input type="number" value={profile.yearsOfExperience} onChange={(e) => setProfile({ ...profile, yearsOfExperience: parseInt(e.target.value) || 0 })} /></div>
+          <div className="md:col-span-2 space-y-1"><label className="text-xs font-medium">Summary</label><textarea className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[100px]" value={profile.summary} onChange={(e) => setProfile({ ...profile, summary: e.target.value })} /></div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><GraduationCap className="h-4 w-4" />Education</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {education.map((edu, i) => (
+            <div key={edu.id || i} className="flex items-start gap-3 rounded-lg border p-3">
+              <div className="flex-1">
+                <p className="font-medium">{edu.degree} {edu.fieldOfStudy && `in ${edu.fieldOfStudy}`}</p>
+                <p className="text-sm text-muted-foreground">{edu.institution}</p>
+                <p className="text-xs text-muted-foreground">{edu.startDate} – {edu.endDate || "Present"}</p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setEducation(education.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Institution" className="w-40" value={newEdu.institution || ""} onChange={(e) => setNewEdu({ ...newEdu, institution: e.target.value })} />
+            <Input placeholder="Degree" className="w-32" value={newEdu.degree || ""} onChange={(e) => setNewEdu({ ...newEdu, degree: e.target.value })} />
+            <Input placeholder="Field of study" className="w-36" value={newEdu.fieldOfStudy || ""} onChange={(e) => setNewEdu({ ...newEdu, fieldOfStudy: e.target.value })} />
+            <Input type="date" className="w-36" value={newEdu.startDate || ""} onChange={(e) => setNewEdu({ ...newEdu, startDate: e.target.value })} />
+            <Input type="date" className="w-36" value={newEdu.endDate || ""} onChange={(e) => setNewEdu({ ...newEdu, endDate: e.target.value })} />
+            <Button size="sm" onClick={() => { if (newEdu.institution) { setEducation([...education, { id: "", ...newEdu } as Education]); setNewEdu({}); } }}><Plus className="mr-1 h-3 w-3" />Add</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Award className="h-4 w-4" />Certifications</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {certifications.map((cert, i) => (
+            <div key={cert.id || i} className="flex items-start gap-3 rounded-lg border p-3">
+              <div className="flex-1">
+                <p className="font-medium">{cert.name}</p>
+                <p className="text-sm text-muted-foreground">{cert.issuingOrg}</p>
+                <p className="text-xs text-muted-foreground">{cert.issueDate} {cert.expiryDate && `– ${cert.expiryDate}`}</p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setCertifications(certifications.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Certification name" className="w-48" value={newCert.name || ""} onChange={(e) => setNewCert({ ...newCert, name: e.target.value })} />
+            <Input placeholder="Issuing org" className="w-40" value={newCert.issuingOrg || ""} onChange={(e) => setNewCert({ ...newCert, issuingOrg: e.target.value })} />
+            <Input type="date" className="w-36" value={newCert.issueDate || ""} onChange={(e) => setNewCert({ ...newCert, issueDate: e.target.value })} />
+            <Input placeholder="Credential URL" className="w-48" value={newCert.credentialUrl || ""} onChange={(e) => setNewCert({ ...newCert, credentialUrl: e.target.value })} />
+            <Button size="sm" onClick={() => { if (newCert.name) { setCertifications([...certifications, { id: "", ...newCert } as Certification]); setNewCert({}); } }}><Plus className="mr-1 h-3 w-3" />Add</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Link2 className="h-4 w-4" />Links</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {links.map((link, i) => (
+            <div key={link.id || i} className="flex items-center gap-3 rounded-lg border p-3">
+              <Badge variant="outline">{link.linkType}</Badge>
+              <span className="flex-1 text-sm truncate">{link.url}</span>
+              {link.label && <span className="text-xs text-muted-foreground">{link.label}</span>}
+              <Button size="sm" variant="ghost" onClick={() => setLinks(links.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <select className="rounded-md border bg-background px-3 py-2 text-sm" value={newLink.linkType || ""} onChange={(e) => setNewLink({ ...newLink, linkType: e.target.value })}>
+              <option value="">Type</option>
+              {LINK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <Input placeholder="URL" className="w-64" value={newLink.url || ""} onChange={(e) => setNewLink({ ...newLink, url: e.target.value })} />
+            <Input placeholder="Label" className="w-32" value={newLink.label || ""} onChange={(e) => setNewLink({ ...newLink, label: e.target.value })} />
+            <Button size="sm" onClick={() => { if (newLink.linkType && newLink.url) { setLinks([...links, { id: "", ...newLink } as ProfileLink]); setNewLink({}); } }}><Plus className="mr-1 h-3 w-3" />Add</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Briefcase className="h-4 w-4" />Skills</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {skills.map((s, i) => (
+              <Badge key={i} variant="outline" className="cursor-pointer" onClick={() => setSkills(skills.filter((_, j) => j !== i))}>
+                {s.skillName} <span className="ml-1 text-xs text-muted-foreground">x</span>
+              </Badge>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input placeholder="Add skill" className="flex-1" value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && newSkill.trim()) { setSkills([...skills, { id: "", skillName: newSkill.trim(), skillType: "technical" }]); setNewSkill(""); } }} />
+            <Button onClick={() => { if (newSkill.trim()) { setSkills([...skills, { id: "", skillName: newSkill.trim(), skillType: "technical" }]); setNewSkill(""); } }}>Add</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Experience</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {experience.map((exp, i) => (
+            <div key={exp.id || i} className="rounded-lg border p-3">
+              <div className="flex items-start justify-between">
+                <div><p className="font-medium">{exp.title} at {exp.company}</p><p className="text-xs text-muted-foreground">{exp.startDate} – {exp.endDate || "Present"}</p></div>
+                <Button size="sm" variant="ghost" onClick={() => setExperience(experience.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+              </div>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Title" className="w-36" value={newExp.title || ""} onChange={(e) => setNewExp({ ...newExp, title: e.target.value })} />
+            <Input placeholder="Company" className="w-36" value={newExp.company || ""} onChange={(e) => setNewExp({ ...newExp, company: e.target.value })} />
+            <Input type="date" className="w-36" value={newExp.startDate || ""} onChange={(e) => setNewExp({ ...newExp, startDate: e.target.value })} />
+            <Input type="date" className="w-36" value={newExp.endDate || ""} onChange={(e) => setNewExp({ ...newExp, endDate: e.target.value })} />
+            <Button size="sm" onClick={() => { if (newExp.title && newExp.company) { setExperience([...experience, { id: "", description: "", ...newExp } as Experience]); setNewExp({}); } }}><Plus className="mr-1 h-3 w-3" />Add</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Projects</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {projects.map((proj, i) => (
+            <div key={proj.id || i} className="flex items-start justify-between rounded-lg border p-3">
+              <div><p className="font-medium">{proj.name}</p><p className="text-sm text-muted-foreground">{proj.technologies}</p></div>
+              <Button size="sm" variant="ghost" onClick={() => setProjects(projects.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Project name" className="w-40" value={newProject.name || ""} onChange={(e) => setNewProject({ ...newProject, name: e.target.value })} />
+            <Input placeholder="Technologies" className="w-40" value={newProject.technologies || ""} onChange={(e) => setNewProject({ ...newProject, technologies: e.target.value })} />
+            <Input placeholder="URL" className="w-48" value={newProject.url || ""} onChange={(e) => setNewProject({ ...newProject, url: e.target.value })} />
+            <Button size="sm" onClick={() => { if (newProject.name) { setProjects([...projects, { id: "", description: "", ...newProject } as Project]); setNewProject({}); } }}><Plus className="mr-1 h-3 w-3" />Add</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

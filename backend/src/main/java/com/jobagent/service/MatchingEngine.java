@@ -38,6 +38,7 @@ public class MatchingEngine {
     private final ApplicationService applicationService;
     private final ProfileService profileService;
     private final MeterRegistry meterRegistry;
+    private final QueueProducerService queueProducerService;
 
     @Transactional
     public JobMatchResponse scoreJob(UUID userId, UUID jobId) {
@@ -270,6 +271,10 @@ public class MatchingEngine {
         } catch (Exception e) {
             applicationError = e.getMessage();
             log.error("Application creation failed for match {}: {}", matchId, e.getMessage());
+        }
+
+        if (application != null) {
+            queueProducerService.sendApplicationSubmission(application.id());
         }
 
         return new ApproveMatchResponse(matchResponse, coverLetter, application, coverLetterError, applicationError);

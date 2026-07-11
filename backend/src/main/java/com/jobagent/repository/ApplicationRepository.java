@@ -34,6 +34,10 @@ public interface ApplicationRepository extends JpaRepository<Application, UUID> 
 
     long countByUserIdAndSubmittedAtAfter(UUID userId, OffsetDateTime since);
 
+    long countByUserIdAndDateRange(UUID userId, OffsetDateTime start, OffsetDateTime end);
+
+    long countByUserIdAndSubmittedAtBetween(UUID userId, OffsetDateTime start, OffsetDateTime end);
+
     @Query(value = "SELECT a.status, COUNT(*) FROM applications a WHERE a.user_id = :userId GROUP BY a.status", nativeQuery = true)
     List<Object[]> countByStatusGrouped(@Param("userId") UUID userId);
 
