@@ -37,7 +37,7 @@ jobs:
       - name: Build and push AI service
         uses: docker/build-push-action@v5
         with:
-          context: ./ai-service
+          context: ./ai_service
           push: true
           tags: ghcr.io/${{ github.repository }}/ai-service:latest
           cache-from: type=gha
