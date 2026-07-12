@@ -47,9 +47,13 @@ jobs:
           TRIVY_VERSION: 0.58.2
         run: |
           mkdir -p "$HOME/.local/bin"
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-            | sh -s -- -b "$HOME/.local/bin" "v${TRIVY_VERSION}"
+          curl -sfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            -o /tmp/trivy.tar.gz
+          tar -xzf /tmp/trivy.tar.gz -C /tmp trivy
+          mv /tmp/trivy "$HOME/.local/bin/trivy"
+          chmod +x "$HOME/.local/bin/trivy"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/trivy" --version
 
       - name: Run Trivy report
         run: |
