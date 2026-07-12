@@ -30,25 +30,39 @@ jobs:
 
       - name: Warm Maven dependency cache
         working-directory: backend
-        run: mvn -B -DskipTests dependency:go-offline
+        run: mvn -B -DskipTests dependency:go-offline dependency:resolve
 
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy secret and misconfiguration scanner
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: 'backend/'
-          scanners: 'vuln,secret,misconfig'
+          scanners: 'secret,misconfig'
           format: 'sarif'
           output: 'trivy-results.sarif'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
 
       - name: Upload Trivy results to GitHub Security
         if: always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
+
+      - name: Run OWASP Dependency-Check
+        working-directory: backend
+        run: |
+          mvn -B org.owasp:dependency-check-maven:12.1.0:check \
+            -Dformat=ALL \
+            -DsuppressionFile=owasp-suppression.xml \
+            -DfailBuildOnCVSS=7 \
+            -DskipTestScope=true
+
+      - name: Upload OWASP Dependency-Check SARIF
+        if: always() && hashFiles('backend/target/dependency-check-report.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: 'backend/target/dependency-check-report.sarif'
 
   build-and-test:
     runs-on: ubuntu-latest
