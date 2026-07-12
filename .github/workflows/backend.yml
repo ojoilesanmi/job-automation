@@ -18,6 +18,8 @@ jobs:
     permissions:
       contents: read
       security-events: write
+    env:
+      NVD_API_KEY_ENC: ENC(9ZgoU7wwWDOI/UvtuCOc5Rgv6ZRsGSbx84N9bHscEI/lnjlIBeu0pS+XrBpGwWmcd/tVcKH3SawTYesBsf39dClvBpG1Wek8kooZTxX65as=)
     steps:
       - uses: actions/checkout@v5
 
@@ -41,6 +43,24 @@ jobs:
       - name: Warm Maven dependency cache
         working-directory: backend
         run: mvn -B -DskipTests dependency:go-offline dependency:resolve
+
+      - name: Compile encryption helper
+        working-directory: backend
+        run: mvn -B -DskipTests compile
+
+      - name: Decrypt NVD API key
+        working-directory: backend
+        env:
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: |
+          if [ -z "$ENCRYPTION_KEY" ]; then
+            echo "ENCRYPTION_KEY GitHub secret is required to decrypt NVD_API_KEY_ENC"
+            exit 1
+          fi
+
+          NVD_API_KEY=$(java -cp target/classes com.jobagent.security.EncryptionTool decrypt "$NVD_API_KEY_ENC")
+          echo "::add-mask::$NVD_API_KEY"
+          echo "NVD_API_KEY=$NVD_API_KEY" >> "$GITHUB_ENV"
 
       - name: Run Trivy report
         run: |
@@ -90,6 +110,7 @@ jobs:
             -Dformat=ALL \
             -DsuppressionFile=owasp-suppression.xml \
             -DdataDirectory=$HOME/.dependency-check \
+            -DnvdApiKey=$NVD_API_KEY \
             -DfailBuildOnCVSS=7 \
             -DskipTestScope=true
 
