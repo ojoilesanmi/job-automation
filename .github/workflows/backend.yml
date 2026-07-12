@@ -28,20 +28,54 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Cache security scanner data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/trivy
+            ~/.dependency-check
+          key: security-scanners-${{ runner.os }}-${{ hashFiles('backend/pom.xml') }}
+          restore-keys: |
+            security-scanners-${{ runner.os }}-
+
       - name: Warm Maven dependency cache
         working-directory: backend
         run: mvn -B -DskipTests dependency:go-offline dependency:resolve
 
-      - name: Run Trivy secret and misconfiguration scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: 'backend/'
-          scanners: 'secret,misconfig'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          exit-code: '1'
-          severity: 'CRITICAL,HIGH'
+      - name: Install Trivy CLI
+        env:
+          TRIVY_VERSION: 0.58.2
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b "$HOME/.local/bin" "v${TRIVY_VERSION}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run Trivy report
+        run: |
+          trivy fs backend/ \
+            --scanners secret,misconfig \
+            --severity HIGH,CRITICAL \
+            --format table \
+            --exit-code 0
+
+      - name: Generate Trivy SARIF
+        if: always()
+        run: |
+          trivy fs backend/ \
+            --scanners secret,misconfig \
+            --severity HIGH,CRITICAL \
+            --format sarif \
+            --output trivy-results.sarif \
+            --exit-code 0
+
+      - name: Enforce Trivy findings
+        run: |
+          trivy fs backend/ \
+            --scanners secret,misconfig \
+            --severity HIGH,CRITICAL \
+            --format table \
+            --exit-code 1
 
       - name: Upload Trivy results to GitHub Security
         if: always() && hashFiles('trivy-results.sarif') != ''
@@ -55,6 +89,7 @@ jobs:
           mvn -B org.owasp:dependency-check-maven:12.1.0:check \
             -Dformat=ALL \
             -DsuppressionFile=owasp-suppression.xml \
+            -DdataDirectory=$HOME/.dependency-check \
             -DfailBuildOnCVSS=7 \
             -DskipTestScope=true
 
