@@ -113,9 +113,12 @@ class FollowUpServiceTest {
 
     @Test
     void checkFollowUps_processesDueApplications() {
+        User user = new User();
+        user.setId(UUID.randomUUID());
+
         Application dueApp = Application.builder()
                 .id(UUID.randomUUID())
-                .user(new User())
+                .user(user)
                 .job(Job.builder().title("Developer").company("Tech Co").build())
                 .nextFollowUpAt(OffsetDateTime.now().minusDays(1))
                 .build();

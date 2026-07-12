@@ -59,6 +59,20 @@ public class MetricsConfig {
     }
 
     @Bean
+    public Counter duplicateJobDetectedCounter() {
+        return Counter.builder("jobagent.jobs.duplicates_detected")
+                .description("Number of duplicate jobs detected")
+                .register(meterRegistry);
+    }
+
+    @Bean
+    public Counter duplicateApplicationDetectedCounter() {
+        return Counter.builder("jobagent.applications.duplicates_detected")
+                .description("Number of duplicate applications detected")
+                .register(meterRegistry);
+    }
+
+    @Bean
     public Timer coverLetterGenerationTimer() {
         return Timer.builder("jobagent.cover_letters.generation_time")
                 .description("Time taken to generate cover letters")

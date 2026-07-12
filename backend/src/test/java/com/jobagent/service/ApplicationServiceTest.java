@@ -60,6 +60,7 @@ class ApplicationServiceTest {
                 applicationRepository, eventRepository, jobRepository,
                 cvDocumentRepository, coverLetterRepository, auditLogRepository, meterRegistry
         );
+        applicationService.init("discovered,shortlisted,pending_approval,approved,submitted,viewed,interview,assessment,offer,accepted,rejected,no_response,follow_up_needed,withdrawn");
 
         userId = UUID.randomUUID();
         jobId = UUID.randomUUID();

@@ -184,12 +184,14 @@ public class MatchingEngine {
         BigDecimal roleScore = calculateRoleScore(job, prefs);
         BigDecimal locationScore = calculateLocationScore(job, prefs);
         BigDecimal salaryScore = calculateSalaryScore(job, prefs);
+        BigDecimal domainScore = calculateDomainScore(job, prefs);
 
         BigDecimal fitScore = skillsScore.multiply(new BigDecimal("0.35"))
                 .add(experienceScore.multiply(new BigDecimal("0.20")))
                 .add(roleScore.multiply(new BigDecimal("0.15")))
                 .add(locationScore.multiply(new BigDecimal("0.15")))
                 .add(salaryScore.multiply(new BigDecimal("0.10")))
+                .add(domainScore.multiply(new BigDecimal("0.05")))
                 .setScale(2, RoundingMode.HALF_UP);
 
         return Map.of(
@@ -198,7 +200,8 @@ public class MatchingEngine {
                 "experience", experienceScore,
                 "role", roleScore,
                 "location", locationScore,
-                "salary", salaryScore
+                "salary", salaryScore,
+                "domain", domainScore
         );
     }
 
@@ -369,6 +372,36 @@ public class MatchingEngine {
         if (jobMax.compareTo(threshold) >= 0) return new BigDecimal("100.00");
         if (jobMax.compareTo(threshold.multiply(new BigDecimal("0.8"))) >= 0) return new BigDecimal("70.00");
         return new BigDecimal("40.00");
+    }
+
+    private BigDecimal calculateDomainScore(Job job, UserPreferences prefs) {
+        if (prefs == null) return new BigDecimal("70.00");
+
+        if (prefs.getExcludedCompanies() != null && !prefs.getExcludedCompanies().isBlank()) {
+            String[] excluded = prefs.getExcludedCompanies().toLowerCase().split(",");
+            String companyLower = job.getCompany().toLowerCase();
+            for (String c : excluded) {
+                if (companyLower.contains(c.trim())) return new BigDecimal("0.00");
+            }
+        }
+
+        if (prefs.getExcludedIndustries() != null && !prefs.getExcludedIndustries().isBlank()) {
+            String descLower = (job.getDescription() != null ? job.getDescription() : "").toLowerCase();
+            String[] excluded = prefs.getExcludedIndustries().toLowerCase().split(",");
+            for (String ind : excluded) {
+                if (descLower.contains(ind.trim())) return new BigDecimal("20.00");
+            }
+        }
+
+        if (prefs.getExcludedJobLevels() != null && !prefs.getExcludedJobLevels().isBlank()) {
+            String titleLower = job.getTitle().toLowerCase();
+            String[] excluded = prefs.getExcludedJobLevels().toLowerCase().split(",");
+            for (String level : excluded) {
+                if (titleLower.contains(level.trim())) return new BigDecimal("30.00");
+            }
+        }
+
+        return new BigDecimal("70.00");
     }
 
     private List<String> parseSkills(String skills) {

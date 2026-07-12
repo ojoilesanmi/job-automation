@@ -3,6 +3,8 @@ package com.jobagent.service;
 import com.jobagent.dto.GenerateCoverLetterRequest;
 import com.jobagent.dto.SubmitApplicationRequest;
 import com.jobagent.worker.JobDiscoveryService;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -20,6 +22,7 @@ public class QueueConsumerService {
     private final MatchingEngine matchingEngine;
     private final CoverLetterService coverLetterService;
     private final PlaywrightSubmissionService submissionService;
+    private final MeterRegistry meterRegistry;
 
     @RabbitListener(queues = "job.discovery")
     public void handleJobDiscovery(Map<String, String> message) {
@@ -27,8 +30,18 @@ public class QueueConsumerService {
             UUID sourceId = UUID.fromString(message.get("sourceId"));
             log.info("Processing job discovery for source: {}", message.get("sourceType"));
             jobDiscoveryService.triggerManualDiscovery(sourceId);
+            Counter.builder("jobagent.queue.messages_processed")
+                    .description("Number of queue messages processed")
+                    .tag("queue", "job.discovery")
+                    .register(meterRegistry)
+                    .increment();
         } catch (Exception e) {
             log.error("Failed to process job discovery message: {}", e.getMessage());
+            Counter.builder("jobagent.queue.messages_failed")
+                    .description("Number of queue messages that failed processing")
+                    .tag("queue", "job.discovery")
+                    .register(meterRegistry)
+                    .increment();
         }
     }
 
@@ -38,8 +51,18 @@ public class QueueConsumerService {
             UUID jobId = UUID.fromString(message.get("jobId"));
             log.info("Processing job matching for job: {}", jobId);
             matchingEngine.scoreJob(null, jobId);
+            Counter.builder("jobagent.queue.messages_processed")
+                    .description("Number of queue messages processed")
+                    .tag("queue", "job.matching")
+                    .register(meterRegistry)
+                    .increment();
         } catch (Exception e) {
             log.error("Failed to process job matching message: {}", e.getMessage());
+            Counter.builder("jobagent.queue.messages_failed")
+                    .description("Number of queue messages that failed processing")
+                    .tag("queue", "job.matching")
+                    .register(meterRegistry)
+                    .increment();
         }
     }
 
@@ -52,8 +75,18 @@ public class QueueConsumerService {
             log.info("Processing cover letter generation for job: {}", jobId);
             coverLetterService.generateCoverLetter(userId,
                     new GenerateCoverLetterRequest(jobId, null, tone));
+            Counter.builder("jobagent.queue.messages_processed")
+                    .description("Number of queue messages processed")
+                    .tag("queue", "cover.letter.generation")
+                    .register(meterRegistry)
+                    .increment();
         } catch (Exception e) {
             log.error("Failed to process cover letter generation message: {}", e.getMessage());
+            Counter.builder("jobagent.queue.messages_failed")
+                    .description("Number of queue messages that failed processing")
+                    .tag("queue", "cover.letter.generation")
+                    .register(meterRegistry)
+                    .increment();
         }
     }
 
@@ -64,8 +97,18 @@ public class QueueConsumerService {
             log.info("Processing application submission: {}", applicationId);
             submissionService.submitApplication(null,
                     new SubmitApplicationRequest(applicationId, "browser", null));
+            Counter.builder("jobagent.queue.messages_processed")
+                    .description("Number of queue messages processed")
+                    .tag("queue", "application.submission")
+                    .register(meterRegistry)
+                    .increment();
         } catch (Exception e) {
             log.error("Failed to process application submission message: {}", e.getMessage());
+            Counter.builder("jobagent.queue.messages_failed")
+                    .description("Number of queue messages that failed processing")
+                    .tag("queue", "application.submission")
+                    .register(meterRegistry)
+                    .increment();
         }
     }
 }

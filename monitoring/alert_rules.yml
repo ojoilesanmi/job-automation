@@ -1,0 +1,38 @@
+groups:
+  - name: job-agent-alerts
+    rules:
+      - alert: QueueBacklogHigh
+        expr: sum(rate(jobagent_queue_messages_processed_total[5m])) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue processing backlog detected"
+          description: "Queue message processing rate has dropped below 0.1 msg/s for 5 minutes"
+
+      - alert: SubmissionFailureSpike
+        expr: rate(jobagent_queue_messages_failed_total{queue="application.submission"}[5m]) > 0.5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Application submission failure spike"
+          description: "Submission failure rate exceeds 0.5 failures/s for 2 minutes"
+
+      - alert: ConnectorFailing
+        expr: rate(jobagent_jobs_imported_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job connector not importing"
+          description: "No jobs imported in the last 10 minutes"
+
+      - alert: DatabaseErrors
+        expr: rate(hikaricp_connections_timeout_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection timeouts detected"
+          description: "HikariCP connection timeouts detected in the last 5 minutes"

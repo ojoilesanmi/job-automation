@@ -130,7 +130,6 @@ class NotificationServiceTest {
         Page<Notification> page = new PageImpl<>(List.of(notification, unreadNotification), PageRequest.of(0, 100), 2);
         when(notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, 100)))
                 .thenReturn(page);
-        when(notificationRepository.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
         notificationService.markAllAsRead(userId);
 

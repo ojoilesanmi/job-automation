@@ -20,6 +20,7 @@ import {
   ScrollText,
   Plug,
   Brain,
+  Bell,
 } from "lucide-react";
 
 interface NavItem {
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { label: "Matches", href: "/dashboard/matches", icon: Zap },
   { label: "Applications", href: "/dashboard/applications", icon: Target },
   { label: "Cover Letters", href: "/dashboard/cover-letters", icon: FileText },
+  { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
   { label: "Gmail", href: "/dashboard/gmail", icon: Mail },
   { label: "Learning", href: "/dashboard/learning", icon: Brain },
 ];

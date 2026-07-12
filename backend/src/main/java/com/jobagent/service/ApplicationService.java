@@ -54,6 +54,10 @@ public class ApplicationService {
 
         Application existing = applicationRepository.findByUserIdAndJobId(userId, request.jobId()).orElse(null);
         if (existing != null) {
+            Counter.builder("jobagent.applications.duplicates_detected")
+                    .description("Number of duplicate applications detected")
+                    .register(meterRegistry)
+                    .increment();
             throw new IllegalArgumentException("Application already exists for this job");
         }
 

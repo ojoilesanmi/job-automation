@@ -45,7 +45,10 @@ class ProfileIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data").exists());
 
-        UpdateProfileRequest update = new UpdateProfileRequest("Senior Engineer", "5+ years experience", "Lagos", 5, "Software Engineer");
+        UpdateProfileRequest update = new UpdateProfileRequest(
+                "Senior Engineer", "5+ years experience", "Lagos", 5,
+                "Software Engineer", "Technology", "professional"
+        );
 
         mockMvc.perform(put("/api/v1/profile")
                         .header("Authorization", "Bearer " + authToken)
