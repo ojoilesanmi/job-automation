@@ -29,7 +29,7 @@ import jakarta.annotation.PostConstruct;
 @RequiredArgsConstructor
 public class ApplicationService {
 
-    private final Set<String> allowedAppTransitions = new HashSet<>();
+    private Set<String> allowedAppTransitions;
 
     private final ApplicationRepository applicationRepository;
     private final ApplicationEventRepository eventRepository;
@@ -41,7 +41,7 @@ public class ApplicationService {
 
     @PostConstruct
     public void init(@Value("${app.application.allowed-transitions}") String transitions) {
-        this.allowedAppTransitions.addAll(Arrays.asList(transitions.split(",")));
+        this.allowedAppTransitions = new HashSet<>(Arrays.asList(transitions.split(",")));
     }
 
     @Transactional
