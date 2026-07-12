@@ -20,5 +20,8 @@ public record UpdatePreferencesRequest(
     BigDecimal minimumRelocationFitScore,
     BigDecimal minimumNigeriaFitScore,
     Integer maxApplicationsPerDay,
-    Boolean approvalRequired
+    Boolean approvalRequired,
+    String autoRejectRules,
+    String excludedJobLevels,
+    String excludedIndustries
 ) {}

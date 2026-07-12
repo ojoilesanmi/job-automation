@@ -9,6 +9,7 @@ public record CvDocumentResponse(
     String fileUrl,
     String parsedText,
     String versionName,
+    String targetRoles,
     Boolean isDefault,
     OffsetDateTime createdAt
 ) {}

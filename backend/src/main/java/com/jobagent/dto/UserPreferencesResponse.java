@@ -24,5 +24,8 @@ public record UserPreferencesResponse(
     BigDecimal minimumNigeriaFitScore,
     Integer maxApplicationsPerDay,
     Boolean approvalRequired,
+    String autoRejectRules,
+    String excludedJobLevels,
+    String excludedIndustries,
     OffsetDateTime updatedAt
 ) {}

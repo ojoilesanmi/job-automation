@@ -5,5 +5,7 @@ public record UpdateProfileRequest(
     String summary,
     String location,
     Integer yearsOfExperience,
-    String primaryRole
+    String primaryRole,
+    String industries,
+    String tonePreference
 ) {}

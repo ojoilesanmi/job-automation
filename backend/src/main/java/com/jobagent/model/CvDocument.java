@@ -36,6 +36,9 @@ public class CvDocument {
 
     private String versionName;
 
+    @Column(columnDefinition = "TEXT")
+    private String targetRoles;
+
     @Builder.Default
     private Boolean isDefault = false;
 

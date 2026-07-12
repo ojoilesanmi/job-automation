@@ -6,6 +6,7 @@ import com.jobagent.dto.JobResponse;
 import com.jobagent.exception.ResourceNotFoundException;
 import com.jobagent.model.Job;
 import com.jobagent.repository.JobRepository;
+import com.jobagent.security.SecurityUtils;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -55,9 +58,13 @@ public class JobService {
 
     @Transactional(readOnly = true)
     public JobListResponse searchJobs(String company, String country, String remoteType,
-                                       String search, int page, int size) {
+                                      String source, Boolean relocation, BigDecimal salaryMin,
+                                      String seniority, String role, OffsetDateTime datePostedAfter,
+                                      BigDecimal fitScoreMin, String search, int page, int size) {
+        UUID userId = SecurityUtils.getCurrentUserId();
         Page<Job> jobs = jobRepository.searchJobs(
-                company, country, remoteType, search,
+                userId, company, country, remoteType, source, relocation, salaryMin,
+                seniority, role, datePostedAfter, fitScoreMin, search,
                 PageRequest.of(page, size)
         );
 

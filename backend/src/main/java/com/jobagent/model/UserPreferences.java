@@ -76,6 +76,15 @@ public class UserPreferences {
     @Builder.Default
     private Boolean approvalRequired = true;
 
+    @Column(columnDefinition = "TEXT")
+    private String autoRejectRules;
+
+    @Column(columnDefinition = "TEXT")
+    private String excludedJobLevels;
+
+    @Column(columnDefinition = "TEXT")
+    private String excludedIndustries;
+
     @CreationTimestamp
     @Column(updatable = false)
     private OffsetDateTime createdAt;

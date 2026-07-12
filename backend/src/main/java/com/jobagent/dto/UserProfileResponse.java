@@ -11,6 +11,8 @@ public record UserProfileResponse(
     String location,
     Integer yearsOfExperience,
     String primaryRole,
+    String industries,
+    String tonePreference,
     List<SkillDto> skills,
     List<WorkExperienceDto> experiences,
     List<ProjectDto> projects,

@@ -52,6 +52,8 @@ public class ProfileService {
                 profile.getLocation(),
                 profile.getYearsOfExperience(),
                 profile.getPrimaryRole(),
+                profile.getIndustries(),
+                profile.getTonePreference(),
                 skills.stream().map(s -> new UserProfileResponse.SkillDto(
                         s.getId(), s.getSkillName(), s.getSkillType(), s.getProficiency(), s.getYearsUsed()
                 )).collect(Collectors.toList()),
@@ -79,6 +81,8 @@ public class ProfileService {
         if (request.location() != null) profile.setLocation(request.location());
         if (request.yearsOfExperience() != null) profile.setYearsOfExperience(request.yearsOfExperience());
         if (request.primaryRole() != null) profile.setPrimaryRole(request.primaryRole());
+        if (request.industries() != null) profile.setIndustries(request.industries());
+        if (request.tonePreference() != null) profile.setTonePreference(request.tonePreference());
 
         profileRepository.save(profile);
         return getProfile(userId);
@@ -229,7 +233,7 @@ public class ProfileService {
     private CvDocumentResponse toCvResponse(CvDocument cv) {
         return new CvDocumentResponse(
                 cv.getId(), cv.getFileName(), cv.getFileUrl(), cv.getParsedText(),
-                cv.getVersionName(), cv.getIsDefault(), cv.getCreatedAt()
+                cv.getVersionName(), cv.getTargetRoles(), cv.getIsDefault(), cv.getCreatedAt()
         );
     }
 }

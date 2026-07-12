@@ -36,6 +36,12 @@ public class UserProfile {
 
     private String primaryRole;
 
+    @Column(columnDefinition = "TEXT")
+    private String industries;
+
+    @Column(columnDefinition = "TEXT")
+    private String tonePreference;
+
     @CreationTimestamp
     @Column(updatable = false)
     private OffsetDateTime createdAt;

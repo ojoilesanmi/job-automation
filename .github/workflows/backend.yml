@@ -13,8 +13,23 @@ on:
       - '.github/workflows/backend.yml'
 
 jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'backend/'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
   build-and-test:
     runs-on: ubuntu-latest
+    needs: security-scan
     services:
       postgres:
         image: postgres:16
@@ -61,3 +76,31 @@ jobs:
         with:
           name: backend-jar
           path: backend/target/*.jar
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add your staging deployment commands here
+          # Example: docker-compose -f docker-compose.staging.yml up -d
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add your production deployment commands here
+          # Example: docker-compose -f docker-compose.prod.yml up -d

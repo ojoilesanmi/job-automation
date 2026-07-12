@@ -47,6 +47,9 @@ public class PreferencesService {
         if (request.minimumNigeriaFitScore() != null) prefs.setMinimumNigeriaFitScore(request.minimumNigeriaFitScore());
         if (request.maxApplicationsPerDay() != null) prefs.setMaxApplicationsPerDay(request.maxApplicationsPerDay());
         if (request.approvalRequired() != null) prefs.setApprovalRequired(request.approvalRequired());
+        if (request.autoRejectRules() != null) prefs.setAutoRejectRules(request.autoRejectRules());
+        if (request.excludedJobLevels() != null) prefs.setExcludedJobLevels(request.excludedJobLevels());
+        if (request.excludedIndustries() != null) prefs.setExcludedIndustries(request.excludedIndustries());
 
         prefs = preferencesRepository.save(prefs);
         return toResponse(prefs);
@@ -67,7 +70,9 @@ public class PreferencesService {
                 prefs.getPreferredCountries(), prefs.getExcludedCountries(), prefs.getExcludedCompanies(),
                 prefs.getRemoteMinSalary(), prefs.getRelocationMinSalary(), prefs.getNigeriaMinSalary(),
                 prefs.getMinimumRemoteFitScore(), prefs.getMinimumRelocationFitScore(), prefs.getMinimumNigeriaFitScore(),
-                prefs.getMaxApplicationsPerDay(), prefs.getApprovalRequired(), prefs.getUpdatedAt()
+                prefs.getMaxApplicationsPerDay(), prefs.getApprovalRequired(),
+                prefs.getAutoRejectRules(), prefs.getExcludedJobLevels(), prefs.getExcludedIndustries(),
+                prefs.getUpdatedAt()
         );
     }
 }
