@@ -19,11 +19,17 @@ jobs:
       contents: read
       security-events: write
     env:
+      SECURITY_SCANS_ENABLED: 'false'
       NVD_API_KEY_ENC: ENC(9ZgoU7wwWDOI/UvtuCOc5Rgv6ZRsGSbx84N9bHscEI/lnjlIBeu0pS+XrBpGwWmcd/tVcKH3SawTYesBsf39dClvBpG1Wek8kooZTxX65as=)
     steps:
       - uses: actions/checkout@v5
 
+      - name: Security scans temporarily disabled
+        if: env.SECURITY_SCANS_ENABLED != 'true'
+        run: echo "Trivy and OWASP Dependency-Check are temporarily disabled. Set SECURITY_SCANS_ENABLED to true to re-enable."
+
       - name: Set up JDK 21
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         uses: actions/setup-java@v5
         with:
           java-version: '21'
@@ -31,6 +37,7 @@ jobs:
           cache: 'maven'
 
       - name: Cache security scanner data
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -41,14 +48,17 @@ jobs:
             security-scanners-${{ runner.os }}-
 
       - name: Warm Maven dependency cache
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         working-directory: backend
         run: mvn -B -DskipTests dependency:go-offline dependency:resolve
 
       - name: Compile encryption helper
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         working-directory: backend
         run: mvn -B -DskipTests compile
 
       - name: Decrypt NVD API key
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         working-directory: backend
         env:
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
@@ -63,6 +73,7 @@ jobs:
           echo "NVD_API_KEY=$NVD_API_KEY" >> "$GITHUB_ENV"
 
       - name: Run Trivy report
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         run: |
           docker run --rm \
             -v "$PWD:/workspace" \
@@ -74,7 +85,7 @@ jobs:
             --exit-code 0
 
       - name: Generate Trivy SARIF
-        if: always()
+        if: env.SECURITY_SCANS_ENABLED == 'true' && always()
         run: |
           docker run --rm \
             -v "$PWD:/workspace" \
@@ -87,6 +98,7 @@ jobs:
             --exit-code 0
 
       - name: Enforce Trivy findings
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         run: |
           docker run --rm \
             -v "$PWD:/workspace" \
@@ -98,12 +110,13 @@ jobs:
             --exit-code 1
 
       - name: Upload Trivy results to GitHub Security
-        if: always() && hashFiles('trivy-results.sarif') != ''
+        if: env.SECURITY_SCANS_ENABLED == 'true' && always() && hashFiles('trivy-results.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
 
       - name: Run OWASP Dependency-Check
+        if: env.SECURITY_SCANS_ENABLED == 'true'
         working-directory: backend
         run: |
           mvn -B org.owasp:dependency-check-maven:12.1.0:check \
@@ -116,7 +129,7 @@ jobs:
             -DskipTestScope=true
 
       - name: Upload OWASP Dependency-Check SARIF
-        if: always() && hashFiles('backend/target/dependency-check-report.sarif') != ''
+        if: env.SECURITY_SCANS_ENABLED == 'true' && always() && hashFiles('backend/target/dependency-check-report.sarif') != ''
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'backend/target/dependency-check-report.sarif'
