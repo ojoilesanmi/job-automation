@@ -16,8 +16,6 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        Path uploadPath = Paths.get(uploadDir).toAbsolutePath();
-        registry.addResourceHandler("/uploads/cvs/**")
-                .addResourceLocations("file:" + uploadPath + "/");
+        // Private CV files are served through FileController with ownership checks.
     }
 }

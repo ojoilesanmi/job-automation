@@ -3,6 +3,7 @@ import structlog
 import re
 import ipaddress
 import socket
+import base64
 from urllib.parse import urlparse
 import httpx
 from ..exceptions import ValidationError
@@ -93,23 +94,31 @@ def _extract_text_sync(url: str, file_type: str) -> str:
     return data.decode("utf-8", errors="ignore")
 
 
-async def parse_cv_text(file_url: str, file_type: str) -> dict:
-    logger.info("parsing_cv", file_type=file_type, file_url=file_url[:80])
+async def parse_cv_text(file_url: str | None, file_type: str, file_content_base64: str | None = None) -> dict:
+    logger.info("parsing_cv", file_type=file_type, file_url=(file_url or "")[:80])
 
     if file_type not in ("pdf", "docx"):
         raise ValidationError("Unsupported file type. Must be 'pdf' or 'docx'")
 
-    try:
-        data = await _download_bytes(file_url)
-    except httpx.TimeoutException:
-        raise ValidationError("File download timed out")
-    except httpx.HTTPStatusError as e:
-        raise ValidationError(f"Failed to download file: HTTP {e.response.status_code}")
-    except ValidationError:
-        raise
-    except Exception as e:
-        logger.error("cv_download_error", error=str(e))
-        raise ValidationError("Failed to download file")
+    if file_content_base64:
+        try:
+            data = base64.b64decode(file_content_base64, validate=True)
+        except Exception:
+            raise ValidationError("Invalid base64 file content")
+    else:
+        if not file_url:
+            raise ValidationError("Either fileUrl or fileContentBase64 is required")
+        try:
+            data = await _download_bytes(file_url)
+        except httpx.TimeoutException:
+            raise ValidationError("File download timed out")
+        except httpx.HTTPStatusError as e:
+            raise ValidationError(f"Failed to download file: HTTP {e.response.status_code}")
+        except ValidationError:
+            raise
+        except Exception as e:
+            logger.error("cv_download_error", error=str(e))
+            raise ValidationError("Failed to download file")
 
     if not data or len(data) < 100:
         raise ValidationError("Downloaded file is empty or too small")
@@ -142,6 +151,7 @@ async def parse_cv_text(file_url: str, file_type: str) -> dict:
 
     return {
         "fullName": name,
+        "rawText": text,
         "email": email,
         "phone": phone,
         "location": location,

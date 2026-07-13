@@ -16,7 +16,8 @@ class BaseResponse(BaseModel):
 # --- CV Parsing ---
 
 class CvParseRequest(BaseModel):
-    file_url: str = Field(..., alias="fileUrl")
+    file_url: Optional[str] = Field(None, alias="fileUrl")
+    file_content_base64: Optional[str] = Field(None, alias="fileContentBase64")
     file_type: str = Field(..., alias="fileType", pattern="^(pdf|docx)$")
 
     class Config:
@@ -25,6 +26,7 @@ class CvParseRequest(BaseModel):
 
 class CvParseResponse(BaseModel):
     full_name: Optional[str] = Field(None, alias="fullName")
+    raw_text: Optional[str] = Field(None, alias="rawText")
     email: Optional[str] = None
     phone: Optional[str] = None
     location: Optional[str] = None
@@ -120,6 +122,10 @@ class CoverLetterResponse(BaseModel):
 
     class Config:
         populate_by_name = True
+
+    @property
+    def confidenceScore(self) -> float:
+        return self.confidence_score
 
 
 # --- Injection Check ---

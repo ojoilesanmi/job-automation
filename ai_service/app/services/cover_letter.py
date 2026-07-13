@@ -131,7 +131,8 @@ def _job_points(content: str, request: CoverLetterRequest) -> list[str]:
 def _check_unsupported(content: str, request: CoverLetterRequest) -> list[str]:
     unsupported = []
     combined = f"{str(request.user_profile).lower()} {request.cv_text.lower()}"
-    for num in re.findall(r'\d+(?:,\d{3})*(?:\+)?\s*(?:users?|customers?|revenue|million)', content.lower()):
+    metric_pattern = r'(?:\d+(?:,\d{3})*(?:\+)?\s*(?:users?|customers?|revenue|million)|(?:revenue|users?|customers?)\s*(?:to|of)?\s*\d+(?:,\d{3})*)'
+    for num in re.findall(metric_pattern, content.lower()):
         if num not in combined:
             unsupported.append(f"Unverified metric: {num}")
     return unsupported

@@ -51,9 +51,9 @@ public class ApplicationSubmissionService {
         items.add(new SubmissionChecklistResponse.CheckItem("fit_score_passed", scorePassed,
                 scorePassed ? "Fit score: " + (match != null ? match.getFitScore() : 0) + "%" : "Fit score below threshold"));
 
-        boolean duplicateCheck = applicationRepository.findByUserIdAndJobId(userId, app.getJob().getId()).isPresent();
+        boolean duplicateCheck = applicationRepository.countOtherApplicationsForJob(userId, app.getJob().getId(), app.getId()) == 0;
         items.add(new SubmissionChecklistResponse.CheckItem("duplicate_check_passed", duplicateCheck,
-                duplicateCheck ? "Not a duplicate application" : "Application record exists (may be duplicate)"));
+                duplicateCheck ? "Not a duplicate application" : "Duplicate application found for this job"));
 
         boolean hasUrl = app.getJob().getApplicationUrl() != null && !app.getJob().getApplicationUrl().isBlank();
         items.add(new SubmissionChecklistResponse.CheckItem("application_url_available", hasUrl,

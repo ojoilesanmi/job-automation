@@ -19,7 +19,7 @@ jobs:
       contents: read
       security-events: write
     env:
-      SECURITY_SCANS_ENABLED: 'false'
+      SECURITY_SCANS_ENABLED: 'true'
       NVD_API_KEY_ENC: ENC(9ZgoU7wwWDOI/UvtuCOc5Rgv6ZRsGSbx84N9bHscEI/lnjlIBeu0pS+XrBpGwWmcd/tVcKH3SawTYesBsf39dClvBpG1Wek8kooZTxX65as=)
     steps:
       - uses: actions/checkout@v5
@@ -174,8 +174,11 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: postgres
           JWT_SECRET: ci-test-secret-key-for-testing-only
         run: |
-          mvn clean package -q -DskipTests
-          mvn test -Dtest='!*IntegrationTest'
+          mvn -B clean package -Dtest='!*IntegrationTest'
+
+      - name: Generate Checkstyle report
+        working-directory: backend
+        run: mvn -B checkstyle:checkstyle -Dcheckstyle.skip=false
 
       - name: Upload JAR
         if: github.ref == 'refs/heads/main'

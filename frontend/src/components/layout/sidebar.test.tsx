@@ -15,8 +15,12 @@ jest.mock("@/lib/auth-context", () => ({
 }));
 
 jest.mock("next/link", () => {
+  type LinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+    href: string;
+    children?: React.ReactNode;
+  };
   return React.forwardRef(function MockLink(
-    { children, href, ...props }: { children: React.ReactNode; href: string; [key: string]: unknown },
+    { children, href, ...props }: LinkProps,
     ref: React.Ref<HTMLAnchorElement>
   ) {
     return React.createElement("a", { href, ref, ...props }, children);

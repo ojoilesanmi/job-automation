@@ -7,6 +7,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +24,9 @@ public class QueueConsumerService {
     private final CoverLetterService coverLetterService;
     private final PlaywrightSubmissionService submissionService;
     private final MeterRegistry meterRegistry;
+
+    @Value("${app.queue.submission.enabled:false}")
+    private boolean queuedSubmissionEnabled;
 
     @RabbitListener(queues = "job.discovery")
     public void handleJobDiscovery(Map<String, String> message) {
@@ -49,8 +53,14 @@ public class QueueConsumerService {
     public void handleJobMatching(Map<String, String> message) {
         try {
             UUID jobId = UUID.fromString(message.get("jobId"));
+            String userIdRaw = message.get("userId");
+            if (userIdRaw == null || userIdRaw.isBlank()) {
+                log.info("Skipping queued job matching for job {} because no userId was provided", jobId);
+                return;
+            }
+            UUID userId = UUID.fromString(userIdRaw);
             log.info("Processing job matching for job: {}", jobId);
-            matchingEngine.scoreJob(null, jobId);
+            matchingEngine.scoreJob(userId, jobId);
             Counter.builder("jobagent.queue.messages_processed")
                     .description("Number of queue messages processed")
                     .tag("queue", "job.matching")
@@ -94,8 +104,18 @@ public class QueueConsumerService {
     public void handleApplicationSubmission(Map<String, String> message) {
         try {
             UUID applicationId = UUID.fromString(message.get("applicationId"));
+            if (!queuedSubmissionEnabled) {
+                log.info("Skipping queued application submission {} because app.queue.submission.enabled=false", applicationId);
+                return;
+            }
+            String userIdRaw = message.get("userId");
+            if (userIdRaw == null || userIdRaw.isBlank()) {
+                log.warn("Skipping queued application submission {} because no userId was provided", applicationId);
+                return;
+            }
+            UUID userId = UUID.fromString(userIdRaw);
             log.info("Processing application submission: {}", applicationId);
-            submissionService.submitApplication(null,
+            submissionService.submitApplication(userId,
                     new SubmitApplicationRequest(applicationId, "browser", null));
             Counter.builder("jobagent.queue.messages_processed")
                     .description("Number of queue messages processed")

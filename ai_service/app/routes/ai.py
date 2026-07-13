@@ -21,7 +21,7 @@ router = APIRouter()
 
 @router.post("/parse-cv", response_model=CvParseResponse)
 async def parse_cv(request: CvParseRequest):
-    return await parse_cv_text(request.file_url, request.file_type)
+    return await parse_cv_text(request.file_url, request.file_type, request.file_content_base64)
 
 
 @router.post("/parse-job", response_model=JobParseResponse)

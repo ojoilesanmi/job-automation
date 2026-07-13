@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Map;
+import java.util.Base64;
 
 @Slf4j
 @Service
@@ -33,6 +34,23 @@ public class AiServiceClient {
                     .block();
         } catch (Exception e) {
             log.error("AI service CV parse failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    public JsonNode parseCvContent(byte[] fileContent, String fileType) {
+        try {
+            return aiServiceWebClient.post()
+                    .uri("/api/v1/ai/parse-cv")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(Map.of(
+                            "fileContentBase64", Base64.getEncoder().encodeToString(fileContent),
+                            "fileType", fileType))
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("AI service CV content parse failed: {}", e.getMessage());
             return null;
         }
     }

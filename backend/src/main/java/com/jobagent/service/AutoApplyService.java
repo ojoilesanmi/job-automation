@@ -5,6 +5,7 @@ import com.jobagent.model.*;
 import com.jobagent.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,9 +23,16 @@ public class AutoApplyService {
     private final CoverLetterService coverLetterService;
     private final NotificationService notificationService;
 
+    @Value("${app.auto-apply.enabled:false}")
+    private boolean autoApplyEnabled;
+
     @Scheduled(cron = "0 0 10 * * *")
     @Transactional
     public void processAutoApply() {
+        if (!autoApplyEnabled) {
+            log.debug("Auto-apply skipped because app.auto-apply.enabled=false");
+            return;
+        }
         List<UserPreferences> allPrefs = preferencesRepository.findAll();
         for (UserPreferences prefs : allPrefs) {
             if (Boolean.FALSE.equals(prefs.getApprovalRequired())) {
@@ -35,6 +43,9 @@ public class AutoApplyService {
 
     @Transactional
     public Map<String, Object> processAutoApplyForUser(UUID userId) {
+        if (!autoApplyEnabled) {
+            return Map.of("autoApplyEnabled", false, "processed", 0, "skipped", 0);
+        }
         UserPreferences prefs = preferencesRepository.findByUserId(userId).orElse(null);
         if (prefs == null || Boolean.TRUE.equals(prefs.getApprovalRequired())) {
             return Map.of("autoApplyEnabled", false, "processed", 0);
@@ -46,7 +57,8 @@ public class AutoApplyService {
         int skipped = 0;
 
         for (JobMatch match : candidates) {
-            if (processed >= prefs.getMaxApplicationsPerDay()) break;
+            int dailyLimit = prefs.getMaxApplicationsPerDay() != null ? prefs.getMaxApplicationsPerDay() : 0;
+            if (dailyLimit <= 0 || processed >= dailyLimit) break;
 
             boolean meetsThreshold = match.getFitScore().compareTo(prefs.getMinimumRemoteFitScore()) >= 0;
             boolean notExcluded = prefs.getExcludedCompanies() == null ||

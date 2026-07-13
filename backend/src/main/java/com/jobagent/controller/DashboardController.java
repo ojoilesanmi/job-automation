@@ -24,12 +24,14 @@ public class DashboardController {
 
     @GetMapping("/stats")
     public ResponseEntity<BaseResponse<Map<String, Object>>> getStats() {
-        DashboardOverviewResponse overview = dashboardService.getOverview(SecurityUtils.getCurrentUserId());
+        var userId = SecurityUtils.getCurrentUserId();
+        DashboardOverviewResponse overview = dashboardService.getOverview(userId);
+        PipelineReportResponse pipeline = dashboardService.getPipelineReport(userId);
         Map<String, Object> stats = Map.of(
             "totalJobs", overview.totalJobsDiscovered(),
             "pendingApprovals", overview.pendingApproval(),
-            "appliedThisWeek", overview.applicationsSubmitted(),
-            "averageMatchScore", overview.responseRate()
+            "appliedThisWeek", pipeline.thisWeekApplications(),
+            "averageMatchScore", overview.averageMatchScore()
         );
         return ResponseEntity.ok(BaseResponse.success(stats));
     }

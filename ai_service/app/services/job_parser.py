@@ -98,10 +98,11 @@ def _extract_salary(text: str) -> tuple:
     salary_min = _parse_num(m.group(1))
     salary_max = _parse_num(m.group(2))
 
+    salary_text = m.group(0)
     prefix = text[:m.start()]
-    if '€' in prefix:
+    if '€' in salary_text or '€' in prefix:
         currency = "EUR"
-    elif '£' in prefix:
+    elif '£' in salary_text or '£' in prefix:
         currency = "GBP"
     else:
         currency = "USD"

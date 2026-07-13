@@ -34,9 +34,14 @@ public interface ApplicationRepository extends JpaRepository<Application, UUID> 
 
     long countByUserIdAndSubmittedAtAfter(UUID userId, OffsetDateTime since);
 
-    long countByUserIdAndDateRange(UUID userId, OffsetDateTime start, OffsetDateTime end);
+    @Query(value = "SELECT COUNT(*) FROM applications a WHERE a.user_id = :userId AND a.created_at >= :start AND a.created_at < :end", nativeQuery = true)
+    long countByUserIdAndDateRange(@Param("userId") UUID userId, @Param("start") OffsetDateTime start, @Param("end") OffsetDateTime end);
 
-    long countByUserIdAndSubmittedAtBetween(UUID userId, OffsetDateTime start, OffsetDateTime end);
+    @Query(value = "SELECT COUNT(*) FROM applications a WHERE a.user_id = :userId AND a.submitted_at >= :start AND a.submitted_at < :end", nativeQuery = true)
+    long countByUserIdAndSubmittedAtBetween(@Param("userId") UUID userId, @Param("start") OffsetDateTime start, @Param("end") OffsetDateTime end);
+
+    @Query(value = "SELECT COUNT(*) FROM applications a WHERE a.user_id = :userId AND a.job_id = :jobId AND a.id <> :applicationId", nativeQuery = true)
+    long countOtherApplicationsForJob(@Param("userId") UUID userId, @Param("jobId") UUID jobId, @Param("applicationId") UUID applicationId);
 
     @Query(value = "SELECT a.status, COUNT(*) FROM applications a WHERE a.user_id = :userId GROUP BY a.status", nativeQuery = true)
     List<Object[]> countByStatusGrouped(@Param("userId") UUID userId);

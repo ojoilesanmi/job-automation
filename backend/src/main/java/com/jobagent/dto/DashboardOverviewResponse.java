@@ -10,7 +10,7 @@ public record DashboardOverviewResponse(
     long rejectedJobs,
     long interviewInvites,
     long assessmentsReceived,
-    double responseRate,
+    double averageMatchScore,
     Map<String, Long> applicationsByCountry,
-    Map<String, Long> applicationsBySource
+    Map<String, Long> applicationsByRole
 ) {}

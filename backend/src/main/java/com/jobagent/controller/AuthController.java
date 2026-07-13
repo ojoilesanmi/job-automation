@@ -47,8 +47,12 @@ public class AuthController {
         if (email == null || email.isBlank()) {
             return ResponseEntity.badRequest().body(BaseResponse.error("VALIDATION_ERROR", "Email is required"));
         }
-        UUID userId = authService.getUserIdByEmail(email);
-        passwordResetService.requestReset(userId);
+        try {
+            UUID userId = authService.getUserIdByEmail(email);
+            passwordResetService.requestReset(userId);
+        } catch (Exception ignored) {
+            // Always return a generic success response to avoid account enumeration.
+        }
         return ResponseEntity.ok(BaseResponse.success("Password reset email sent", null));
     }
 

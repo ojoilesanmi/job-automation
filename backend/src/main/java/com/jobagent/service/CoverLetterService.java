@@ -76,23 +76,30 @@ public class CoverLetterService {
         try {
             Map<String, Object> aiRequest = new LinkedHashMap<>();
             aiRequest.put("jobTitle", job.getTitle());
-            aiRequest.put("company", job.getCompany());
+            aiRequest.put("jobCompany", job.getCompany());
             aiRequest.put("jobDescription", job.getDescription() != null ? job.getDescription() : "");
 
+            List<String> skillNames = skills.stream().map(ProfileSkill::getSkillName).toList();
             if (profile != null) {
                 Map<String, Object> profileData = new LinkedHashMap<>();
                 profileData.put("name", profile.getHeadline() != null ? profile.getHeadline() : "Applicant");
                 profileData.put("summary", profile.getSummary() != null ? profile.getSummary() : "");
-                aiRequest.put("profile", profileData);
+                profileData.put("yearsOfExperience", profile.getYearsOfExperience());
+                profileData.put("primaryRole", profile.getPrimaryRole());
+                aiRequest.put("userProfile", profileData);
+            } else {
+                aiRequest.put("userProfile", Map.of("name", "Applicant"));
             }
 
-            Map<String, Object> cvData = new LinkedHashMap<>();
+            String cvText;
             if (cv != null && cv.getParsedText() != null) {
-                cvData.put("parsedText", cv.getParsedText());
+                cvText = cv.getParsedText();
             } else {
-                cvData.put("parsedText", buildProfileText(skills, experiences));
+                cvText = buildProfileText(skills, experiences);
             }
-            aiRequest.put("cv", cvData);
+            aiRequest.put("cvText", cvText);
+            aiRequest.put("matchedSkills", skillNames);
+            aiRequest.put("missingSkills", List.of());
 
             aiRequest.put("tone", tone != null ? tone : "professional");
 

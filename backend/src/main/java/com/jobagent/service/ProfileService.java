@@ -4,10 +4,8 @@ import com.jobagent.dto.*;
 import com.jobagent.exception.ResourceNotFoundException;
 import com.jobagent.model.*;
 import com.jobagent.repository.*;
-import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,7 +28,7 @@ public class ProfileService {
     private final WorkExperienceRepository experienceRepository;
     private final ProjectRepository projectRepository;
     private final FileStorageService fileStorageService;
-    private final AiServiceClient aiServiceClient;
+    private final CvParsingService cvParsingService;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(UUID userId) {
@@ -202,102 +200,9 @@ public class ProfileService {
 
         cv = cvDocumentRepository.save(cv);
 
-        parseCvAndPopulateProfile(userId, cv);
+        cvParsingService.parseCvAndPopulateProfile(userId, cv.getId());
 
         return toCvResponse(cv);
-    }
-
-    @Async
-    public void parseCvAndPopulateProfile(UUID userId, CvDocument cv) {
-        try {
-            String fileType = cv.getFileName().toLowerCase().endsWith(".pdf") ? "pdf" : "docx";
-            JsonNode parsed = aiServiceClient.parseCv(cv.getFileUrl(), fileType);
-            if (parsed == null) return;
-
-            cv.setParsedText(parsed.has("rawText") ? parsed.get("rawText").asText() : null);
-            cvDocumentRepository.save(cv);
-
-            UserProfile profile = profileRepository.findByUserId(userId).orElse(null);
-            if (profile == null) {
-                User user = new User();
-                user.setId(userId);
-                profile = UserProfile.builder().user(user).build();
-            }
-
-            if (parsed.has("name") && !parsed.get("name").asText().isBlank()) {
-                String fullName = parsed.get("name").asText();
-                if (profile.getHeadline() == null) profile.setHeadline(fullName);
-            }
-            if (parsed.has("summary") && !parsed.get("summary").asText().isBlank()) {
-                if (profile.getSummary() == null) profile.setSummary(parsed.get("summary").asText());
-            }
-            if (parsed.has("location") && !parsed.get("location").asText().isBlank()) {
-                if (profile.getLocation() == null) profile.setLocation(parsed.get("location").asText());
-            }
-            if (parsed.has("yearsExperience")) {
-                int years = parsed.get("yearsExperience").asInt(0);
-                if (years > 0 && profile.getYearsOfExperience() == null) {
-                    profile.setYearsOfExperience(years);
-                }
-            }
-
-            profile = profileRepository.save(profile);
-
-            if (parsed.has("skills") && parsed.get("skills").isArray()) {
-                List<ProfileSkill> existing = skillRepository.findByUserId(userId);
-                if (existing.isEmpty()) {
-                    User user = new User();
-                    user.setId(userId);
-                    List<ProfileSkill> skills = new ArrayList<>();
-                    for (JsonNode s : parsed.get("skills")) {
-                        String name = s.isTextual() ? s.asText() : s.path("name").asText("");
-                        if (!name.isBlank()) {
-                            skills.add(ProfileSkill.builder()
-                                    .user(user)
-                                    .skillName(name)
-                                    .skillType("technical")
-                                    .build());
-                        }
-                    }
-                    skillRepository.saveAll(skills);
-                }
-            }
-
-            if (parsed.has("experience") && parsed.get("experience").isArray()) {
-                List<WorkExperience> existing = experienceRepository.findByUserIdOrderByStartDateDesc(userId);
-                if (existing.isEmpty()) {
-                    User user = new User();
-                    user.setId(userId);
-                    List<WorkExperience> exps = new ArrayList<>();
-                    for (JsonNode e : parsed.get("experience")) {
-                        String company = e.path("company").asText("");
-                        String title = e.path("title").asText("");
-                        if (!company.isBlank() || !title.isBlank()) {
-                            WorkExperience exp = WorkExperience.builder()
-                                    .user(user)
-                                    .company(company)
-                                    .title(title)
-                                    .description(e.path("description").asText(""))
-                                    .build();
-                            String startStr = e.path("startDate").asText(null);
-                            if (startStr != null) {
-                                try { exp.setStartDate(LocalDate.parse(startStr)); } catch (Exception ignored) {}
-                            }
-                            String endStr = e.path("endDate").asText(null);
-                            if (endStr != null) {
-                                try { exp.setEndDate(LocalDate.parse(endStr)); } catch (Exception ignored) {}
-                            }
-                            exps.add(exp);
-                        }
-                    }
-                    experienceRepository.saveAll(exps);
-                }
-            }
-
-            log.info("CV parsed and profile auto-populated for user {}", userId);
-        } catch (Exception e) {
-            log.warn("CV auto-parse failed for user {}: {}", userId, e.getMessage());
-        }
     }
 
     @Transactional
@@ -318,7 +223,7 @@ public class ProfileService {
 
     private CvDocumentResponse toCvResponse(CvDocument cv) {
         return new CvDocumentResponse(
-                cv.getId(), cv.getFileName(), cv.getFileUrl(), cv.getParsedText(),
+                cv.getId(), cv.getFileName(), "/api/v1/files/cvs/" + cv.getId(), cv.getParsedText(),
                 cv.getVersionName(), cv.getTargetRoles(), cv.getIsDefault(), cv.getCreatedAt()
         );
     }

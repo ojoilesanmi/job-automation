@@ -67,8 +67,9 @@ public class MatchingEngine {
 
         if (prefs != null && isNigerianJob(job)) {
             BigDecimal nigeriaMinSalary = prefs.getNigeriaMinSalary();
-            if (nigeriaMinSalary != null && job.getSalaryMax() != null
-                    && job.getSalaryMax().compareTo(nigeriaMinSalary) < 0) {
+            BigDecimal salary = job.getSalaryMax() != null ? job.getSalaryMax() : job.getSalaryMin();
+            if (nigeriaMinSalary != null && salary != null
+                    && salary.compareTo(nigeriaMinSalary) < 0) {
                 fitScore = BigDecimal.ZERO;
             }
             BigDecimal minFit = prefs.getMinimumNigeriaFitScore();
@@ -146,7 +147,7 @@ public class MatchingEngine {
         try {
             Map<String, Object> aiRequest = new LinkedHashMap<>();
             List<String> skillNames = userSkills.stream().map(ProfileSkill::getSkillName).collect(Collectors.toList());
-            aiRequest.put("skills", skillNames);
+            aiRequest.put("userSkills", skillNames);
 
             List<Map<String, String>> expList = new ArrayList<>();
             for (WorkExperience exp : experiences.stream().limit(5).toList()) {
@@ -156,23 +157,22 @@ public class MatchingEngine {
                 e.put("description", exp.getDescription() != null ? exp.getDescription() : "");
                 expList.add(e);
             }
-            aiRequest.put("experience", expList);
+            Map<String, Object> userProfile = new LinkedHashMap<>();
+            userProfile.put("experience", expList);
 
-            Map<String, Object> jobData = new LinkedHashMap<>();
-            jobData.put("title", job.getTitle());
-            jobData.put("requiredSkills", parseSkills(job.getRequiredSkills()));
-            jobData.put("preferredSkills", parseSkills(job.getPreferredSkills()));
-            jobData.put("experienceYears", job.getExperienceYears());
-            aiRequest.put("job", jobData);
+            aiRequest.put("jobTitle", job.getTitle());
+            aiRequest.put("jobCompany", job.getCompany());
+            aiRequest.put("jobDescription", job.getDescription() != null ? job.getDescription() : "");
+            aiRequest.put("jobRequiredSkills", parseSkills(job.getRequiredSkills()));
+            aiRequest.put("jobPreferredSkills", parseSkills(job.getPreferredSkills()));
 
             if (prefs != null) {
-                Map<String, Object> prefsData = new LinkedHashMap<>();
-                prefsData.put("targetRoles", prefs.getTargetRoles());
-                prefsData.put("preferredCountries", prefs.getPreferredCountries());
-                prefsData.put("remoteFirst", prefs.getRemoteFirst());
-                prefsData.put("minSalary", prefs.getRemoteMinSalary());
-                aiRequest.put("preferences", prefsData);
+                userProfile.put("primaryRole", prefs.getTargetRoles());
+                userProfile.put("preferredCountries", prefs.getPreferredCountries());
+                userProfile.put("remoteFirst", prefs.getRemoteFirst());
+                userProfile.put("minSalary", prefs.getRemoteMinSalary());
             }
+            aiRequest.put("userProfile", userProfile);
 
             JsonNode aiResult = aiServiceClient.analyzeFit(aiRequest);
             if (aiResult != null && aiResult.has("fitScore")) {
@@ -317,10 +317,6 @@ public class MatchingEngine {
         } catch (Exception e) {
             applicationError = e.getMessage();
             log.error("Application creation failed for match {}: {}", matchId, e.getMessage());
-        }
-
-        if (application != null) {
-            queueProducerService.sendApplicationSubmission(application.id());
         }
 
         return new ApproveMatchResponse(matchResponse, coverLetter, application, coverLetterError, applicationError);
@@ -477,9 +473,10 @@ public class MatchingEngine {
     }
 
     private boolean isNigerianJob(Job job) {
-        if (job.getCountry() == null) return false;
-        String country = job.getCountry().toLowerCase();
-        return country.contains("nigeria") || country.equals("ng");
+        String country = job.getCountry() != null ? job.getCountry().toLowerCase() : "";
+        String location = job.getLocation() != null ? job.getLocation().toLowerCase() : "";
+        return country.contains("nigeria") || country.equals("ng")
+                || location.contains("nigeria") || location.contains("lagos") || location.contains("abuja");
     }
 
     private JobMatchResponse toResponse(JobMatch match) {
