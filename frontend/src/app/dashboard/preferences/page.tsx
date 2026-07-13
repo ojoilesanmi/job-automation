@@ -12,15 +12,26 @@ import { Plus, X } from "lucide-react";
 interface Preferences {
   id: string;
   targetRoles: string | null;
+  targetSeniority: string | null;
   preferredSkills: string | null;
+  mustHaveSkills: string | null;
+  niceToHaveSkills: string | null;
   remoteFirst: boolean;
   relocationFriendly: boolean;
   preferredCountries: string | null;
   excludedCountries: string | null;
   excludedCompanies: string | null;
   remoteMinSalary: number | null;
+  relocationMinSalary: number | null;
+  nigeriaMinSalary: number | null;
+  minimumRemoteFitScore: number | null;
+  minimumRelocationFitScore: number | null;
+  minimumNigeriaFitScore: number | null;
   maxApplicationsPerDay: number;
   approvalRequired: boolean;
+  autoRejectRules: string | null;
+  excludedJobLevels: string | null;
+  excludedIndustries: string | null;
 }
 
 function parseList(val: string | null): string[] {
@@ -34,18 +45,35 @@ function toList(arr: string[]): string | null {
 
 export default function PreferencesPage() {
   const [prefs, setPrefs] = useState<Preferences>({
-    id: "", targetRoles: null, preferredSkills: null, remoteFirst: true,
-    relocationFriendly: false, preferredCountries: null, excludedCountries: null,
-    excludedCompanies: null, remoteMinSalary: null, maxApplicationsPerDay: 10, approvalRequired: true,
+    id: "", targetRoles: null, targetSeniority: null, preferredSkills: null,
+    mustHaveSkills: null, niceToHaveSkills: null,
+    remoteFirst: true, relocationFriendly: false,
+    preferredCountries: null, excludedCountries: null, excludedCompanies: null,
+    remoteMinSalary: null, relocationMinSalary: null, nigeriaMinSalary: null,
+    minimumRemoteFitScore: null, minimumRelocationFitScore: null, minimumNigeriaFitScore: null,
+    maxApplicationsPerDay: 10, approvalRequired: true,
+    autoRejectRules: null, excludedJobLevels: null, excludedIndustries: null,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [roles, setRoles] = useState<string[]>([]);
   const [skills, setSkills] = useState<string[]>([]);
   const [countries, setCountries] = useState<string[]>([]);
+  const [excludedCountriesList, setExcludedCountriesList] = useState<string[]>([]);
+  const [excludedCompaniesList, setExcludedCompaniesList] = useState<string[]>([]);
+  const [excludedJobLevelsList, setExcludedJobLevelsList] = useState<string[]>([]);
+  const [excludedIndustriesList, setExcludedIndustriesList] = useState<string[]>([]);
+  const [mustHaveSkillsList, setMustHaveSkillsList] = useState<string[]>([]);
+  const [niceToHaveSkillsList, setNiceToHaveSkillsList] = useState<string[]>([]);
   const [newRole, setNewRole] = useState("");
   const [newSkill, setNewSkill] = useState("");
   const [newCountry, setNewCountry] = useState("");
+  const [newExcludedCountry, setNewExcludedCountry] = useState("");
+  const [newExcludedCompany, setNewExcludedCompany] = useState("");
+  const [newExcludedLevel, setNewExcludedLevel] = useState("");
+  const [newExcludedIndustry, setNewExcludedIndustry] = useState("");
+  const [newMustHave, setNewMustHave] = useState("");
+  const [newNiceToHave, setNewNiceToHave] = useState("");
 
   useEffect(() => {
     api.get<Preferences>("/api/v1/preferences").then((p) => {
@@ -53,6 +81,12 @@ export default function PreferencesPage() {
       setRoles(parseList(p.targetRoles));
       setSkills(parseList(p.preferredSkills));
       setCountries(parseList(p.preferredCountries));
+      setExcludedCountriesList(parseList(p.excludedCountries));
+      setExcludedCompaniesList(parseList(p.excludedCompanies));
+      setExcludedJobLevelsList(parseList(p.excludedJobLevels));
+      setExcludedIndustriesList(parseList(p.excludedIndustries));
+      setMustHaveSkillsList(parseList(p.mustHaveSkills));
+      setNiceToHaveSkillsList(parseList(p.niceToHaveSkills));
     }).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
@@ -64,6 +98,12 @@ export default function PreferencesPage() {
         targetRoles: toList(roles),
         preferredSkills: toList(skills),
         preferredCountries: toList(countries),
+        excludedCountries: toList(excludedCountriesList),
+        excludedCompanies: toList(excludedCompaniesList),
+        excludedJobLevels: toList(excludedJobLevelsList),
+        excludedIndustries: toList(excludedIndustriesList),
+        mustHaveSkills: toList(mustHaveSkillsList),
+        niceToHaveSkills: toList(niceToHaveSkillsList),
       });
       setPrefs(updated);
     } catch {}
@@ -113,21 +153,24 @@ export default function PreferencesPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Job preferences</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Target roles & skills</CardTitle></CardHeader>
           <CardContent className="space-y-6">
             <ListInput label="Target roles" items={roles} setItems={setRoles} value={newRole} setValue={setNewRole} />
-            <ListInput label="Preferred countries" items={countries} setItems={setCountries} value={newCountry} setValue={setNewCountry} />
-            <ListInput label="Skills" items={skills} setItems={setSkills} value={newSkill} setValue={setNewSkill} />
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Remote minimum salary</Label>
-                <Input type="number" value={prefs.remoteMinSalary ?? ""} onChange={(e) => setPrefs({ ...prefs, remoteMinSalary: e.target.value ? +e.target.value : null })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Max applications/day</Label>
-                <Input type="number" value={prefs.maxApplicationsPerDay} onChange={(e) => setPrefs({ ...prefs, maxApplicationsPerDay: +e.target.value })} />
-              </div>
+            <div className="space-y-2">
+              <Label>Target seniority</Label>
+              <Input value={prefs.targetSeniority ?? ""} onChange={(e) => setPrefs({ ...prefs, targetSeniority: e.target.value || null })} placeholder="e.g. Senior, Staff, Lead" />
             </div>
+            <ListInput label="Preferred skills" items={skills} setItems={setSkills} value={newSkill} setValue={setNewSkill} />
+            <ListInput label="Must-have skills" items={mustHaveSkillsList} setItems={setMustHaveSkillsList} value={newMustHave} setValue={setNewMustHave} />
+            <ListInput label="Nice-to-have skills" items={niceToHaveSkillsList} setItems={setNiceToHaveSkillsList} value={newNiceToHave} setValue={setNewNiceToHave} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Location & remote</CardTitle></CardHeader>
+          <CardContent className="space-y-6">
+            <ListInput label="Preferred countries" items={countries} setItems={setCountries} value={newCountry} setValue={setNewCountry} />
+            <ListInput label="Excluded countries" items={excludedCountriesList} setItems={setExcludedCountriesList} value={newExcludedCountry} setValue={setNewExcludedCountry} />
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="remote" checked={prefs.remoteFirst} onChange={(e) => setPrefs({ ...prefs, remoteFirst: e.target.checked })} className="h-4 w-4" />
@@ -137,15 +180,65 @@ export default function PreferencesPage() {
                 <input type="checkbox" id="relocation" checked={prefs.relocationFriendly} onChange={(e) => setPrefs({ ...prefs, relocationFriendly: e.target.checked })} className="h-4 w-4" />
                 <Label htmlFor="relocation">Open to relocation</Label>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Salary thresholds</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Remote minimum salary</Label>
+              <Input type="number" value={prefs.remoteMinSalary ?? ""} onChange={(e) => setPrefs({ ...prefs, remoteMinSalary: e.target.value ? +e.target.value : null })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Relocation minimum salary</Label>
+              <Input type="number" value={prefs.relocationMinSalary ?? ""} onChange={(e) => setPrefs({ ...prefs, relocationMinSalary: e.target.value ? +e.target.value : null })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Nigeria minimum salary</Label>
+              <Input type="number" value={prefs.nigeriaMinSalary ?? ""} onChange={(e) => setPrefs({ ...prefs, nigeriaMinSalary: e.target.value ? +e.target.value : null })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Minimum remote fit score</Label>
+              <Input type="number" value={prefs.minimumRemoteFitScore ?? ""} onChange={(e) => setPrefs({ ...prefs, minimumRemoteFitScore: e.target.value ? +e.target.value : null })} placeholder="Default: 75" />
+            </div>
+            <div className="space-y-2">
+              <Label>Minimum relocation fit score</Label>
+              <Input type="number" value={prefs.minimumRelocationFitScore ?? ""} onChange={(e) => setPrefs({ ...prefs, minimumRelocationFitScore: e.target.value ? +e.target.value : null })} placeholder="Default: 70" />
+            </div>
+            <div className="space-y-2">
+              <Label>Minimum Nigeria fit score</Label>
+              <Input type="number" value={prefs.minimumNigeriaFitScore ?? ""} onChange={(e) => setPrefs({ ...prefs, minimumNigeriaFitScore: e.target.value ? +e.target.value : null })} placeholder="Default: 85" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Exclusions & rules</CardTitle></CardHeader>
+          <CardContent className="space-y-6">
+            <ListInput label="Excluded companies" items={excludedCompaniesList} setItems={setExcludedCompaniesList} value={newExcludedCompany} setValue={setNewExcludedCompany} />
+            <ListInput label="Excluded job levels" items={excludedJobLevelsList} setItems={setExcludedJobLevelsList} value={newExcludedLevel} setValue={setNewExcludedLevel} />
+            <ListInput label="Excluded industries" items={excludedIndustriesList} setItems={setExcludedIndustriesList} value={newExcludedIndustry} setValue={setNewExcludedIndustry} />
+            <div className="space-y-2">
+              <Label>Max applications per day</Label>
+              <Input type="number" value={prefs.maxApplicationsPerDay} onChange={(e) => setPrefs({ ...prefs, maxApplicationsPerDay: +e.target.value })} />
+            </div>
+            <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="approval" checked={prefs.approvalRequired} onChange={(e) => setPrefs({ ...prefs, approvalRequired: e.target.checked })} className="h-4 w-4" />
                 <Label htmlFor="approval">Require approval before applying</Label>
               </div>
             </div>
-            <Button onClick={save} disabled={saving}>{saving ? "Saving..." : "Save preferences"}</Button>
+            <div className="space-y-2">
+              <Label>Auto-reject rules</Label>
+              <Input value={prefs.autoRejectRules ?? ""} onChange={(e) => setPrefs({ ...prefs, autoRejectRules: e.target.value || null })} placeholder="e.g. salary below 50000, title contains intern" />
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      <Button onClick={save} disabled={saving} className="w-full">{saving ? "Saving..." : "Save preferences"}</Button>
     </div>
   );
 }

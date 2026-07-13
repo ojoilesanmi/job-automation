@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -17,6 +18,10 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
     boolean existsBySourceIdAndExternalJobId(UUID sourceId, String externalJobId);
 
     Optional<Job> findByApplicationUrl(String applicationUrl);
+
+    boolean existsByTitleAndCompany(String title, String company);
+
+    List<Job> findByTitleContainingIgnoreCaseAndCompanyContainingIgnoreCase(String titleKeyword, String company);
 
     @Query(value = "SELECT j.* FROM jobs j " +
            "LEFT JOIN job_sources js ON j.source_id = js.id " +

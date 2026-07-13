@@ -25,6 +25,18 @@ public class DashboardService {
     public DashboardOverviewResponse getOverview(UUID userId) {
         double avgScore = matchRepository.averageFitScoreByUserId(userId);
 
+        List<Object[]> countryRows = applicationRepository.countByCountryGrouped(userId);
+        Map<String, Long> byCountry = new LinkedHashMap<>();
+        for (Object[] row : countryRows) {
+            byCountry.put((String) row[0], (Long) row[1]);
+        }
+
+        Map<String, Long> byRole = new LinkedHashMap<>();
+        List<Object[]> roleRows = applicationRepository.countByRoleGrouped(userId);
+        for (Object[] row : roleRows) {
+            byRole.put(row[0] != null ? row[0].toString() : "Unknown", (Long) row[1]);
+        }
+
         return new DashboardOverviewResponse(
                 jobRepository.count(),
                 matchRepository.countByUserIdAndStatus(userId, "scored"),
@@ -34,8 +46,8 @@ public class DashboardService {
                 applicationRepository.countByUserIdAndStatus(userId, "interview"),
                 applicationRepository.countByUserIdAndStatus(userId, "assessment"),
                 Math.round(avgScore * 100.0) / 100.0,
-                Collections.emptyMap(),
-                Collections.emptyMap()
+                byCountry,
+                byRole
         );
     }
 

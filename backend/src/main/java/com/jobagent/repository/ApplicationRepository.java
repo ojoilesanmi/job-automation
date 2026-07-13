@@ -46,4 +46,7 @@ public interface ApplicationRepository extends JpaRepository<Application, UUID> 
 
     @Query(value = "SELECT j.source_id, js.name, COUNT(*) FROM applications a JOIN jobs j ON a.job_id = j.id JOIN job_sources js ON j.source_id = js.id WHERE a.user_id = :userId GROUP BY j.source_id, js.name", nativeQuery = true)
     List<Object[]> countBySourceGrouped(@Param("userId") UUID userId);
+
+    @Query(value = "SELECT j.title, COUNT(*) FROM applications a JOIN jobs j ON a.job_id = j.id WHERE a.user_id = :userId GROUP BY j.title", nativeQuery = true)
+    List<Object[]> countByRoleGrouped(@Param("userId") UUID userId);
 }

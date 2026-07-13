@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -96,17 +97,41 @@ public class JobDiscoveryService {
                         2, RETRY_DELAY_MS,
                         "existsCheck:" + job.getExternalJobId());
                 if (!exists) {
-                    RetryableJobFetch.executeWithRetry(
-                            () -> jobRepository.save(job),
+                    boolean duplicate = RetryableJobFetch.executeWithRetry(
+                            () -> jobRepository.existsByTitleAndCompany(
+                                    job.getTitle(), job.getCompany()),
                             2, RETRY_DELAY_MS,
-                            "saveJob:" + job.getExternalJobId());
-                    saved++;
+                            "fuzzyCheck:" + job.getTitle());
+                    if (!duplicate && job.getTitle() != null && job.getCompany() != null) {
+                        List<Job> similar = jobRepository.findByTitleContainingIgnoreCaseAndCompanyContainingIgnoreCase(
+                                extractKeyWords(job.getTitle()), job.getCompany());
+                        duplicate = !similar.isEmpty();
+                    }
+                    if (!duplicate) {
+                        RetryableJobFetch.executeWithRetry(
+                                () -> jobRepository.save(job),
+                                2, RETRY_DELAY_MS,
+                                "saveJob:" + job.getExternalJobId());
+                        saved++;
+                    } else {
+                        log.debug("Skipped duplicate job: {} at {}", job.getTitle(), job.getCompany());
+                    }
                 }
             } catch (Exception e) {
                 log.debug("Skip duplicate job: {}", job.getExternalJobId());
             }
         }
         return saved;
+    }
+
+    private String extractKeyWords(String title) {
+        if (title == null) return "";
+        String[] stopWords = {"senior", "junior", "staff", "principal", "lead", "i", "ii", "iii", "iv",
+                "software", "engineer", "developer", "manager", "analyst", "the", "a", "an"};
+        return Arrays.stream(title.toLowerCase().split("\\s+"))
+                .filter(w -> w.length() > 2 && Arrays.stream(stopWords).noneMatch(s -> s.equals(w)))
+                .limit(3)
+                .collect(Collectors.joining(" "));
     }
 
     public List<Job> triggerManualDiscovery(UUID sourceId) {

@@ -64,6 +64,20 @@ public class MatchingEngine {
 
         BigDecimal fitScore = scores.get("fit");
         fitScore = applyLearningLoopAdjustment(userId, job.getCompany(), fitScore);
+
+        if (prefs != null && isNigerianJob(job)) {
+            BigDecimal nigeriaMinSalary = prefs.getNigeriaMinSalary();
+            if (nigeriaMinSalary != null && job.getSalaryMax() != null
+                    && job.getSalaryMax().compareTo(nigeriaMinSalary) < 0) {
+                fitScore = BigDecimal.ZERO;
+            }
+            BigDecimal minFit = prefs.getMinimumNigeriaFitScore();
+            if (minFit != null && fitScore.compareTo(BigDecimal.ZERO) > 0
+                    && fitScore.compareTo(minFit) < 0) {
+                fitScore = BigDecimal.ZERO;
+            }
+        }
+
         BigDecimal skillsScore = scores.get("skills");
         BigDecimal experienceScore = scores.get("experience");
         BigDecimal roleScore = scores.get("role");
@@ -460,6 +474,12 @@ public class MatchingEngine {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
+    }
+
+    private boolean isNigerianJob(Job job) {
+        if (job.getCountry() == null) return false;
+        String country = job.getCountry().toLowerCase();
+        return country.contains("nigeria") || country.equals("ng");
     }
 
     private JobMatchResponse toResponse(JobMatch match) {
