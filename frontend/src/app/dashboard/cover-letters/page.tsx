@@ -3,30 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import type { CoverLetterResponse, CoverLetterListResponse } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Clock, Edit3 } from "lucide-react";
-
-interface CoverLetter {
-  id: string;
-  jobId: string;
-  jobTitle: string;
-  company: string;
-  content: string;
-  version: number;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface CoverLetterListResponse {
-  coverLetters: CoverLetter[];
-}
+import { FileText, Clock, Edit3, Download, Trash2, ArrowRight } from "lucide-react";
 
 export default function CoverLettersPage() {
-  const [letters, setLetters] = useState<CoverLetter[]>([]);
+  const [letters, setLetters] = useState<CoverLetterResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showComparison, setShowComparison] = useState(false);
+  const [downloading, setDownloading] = useState<{ id: string; format: string } | null>(null);
 
   useEffect(() => {
     api
@@ -35,6 +23,38 @@ export default function CoverLettersPage() {
       .catch(() => setLetters([]))
       .finally(() => setLoading(false));
   }, []);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((i) => i !== id);
+      if (prev.length >= 2) return [prev[1], id];
+      return [...prev, id];
+    });
+  };
+
+  const selectedLetters = letters.filter((l) => selectedIds.includes(l.id));
+
+  const handleDownload = async (id: string, format: string) => {
+    setDownloading({ id, format });
+    try {
+      const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BASE}/api/v1/cover-letters/${id}/export?format=${format}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cover-letter-${id}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {}
+    setDownloading(null);
+  };
 
   if (loading) {
     return (
@@ -46,7 +66,38 @@ export default function CoverLettersPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Cover Letters</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Cover Letters</h1>
+        {selectedIds.length === 2 && (
+          <Button onClick={() => setShowComparison(!showComparison)}>
+            <ArrowRight className="mr-2 h-4 w-4" />
+            {showComparison ? "Hide comparison" : "Compare selected"}
+          </Button>
+        )}
+      </div>
+
+      {showComparison && selectedLetters.length === 2 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Side-by-Side Comparison</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 md:grid-cols-2">
+              {selectedLetters.map((letter) => (
+                <div key={letter.id} className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{letter.jobTitle}</Badge>
+                    <Badge variant="outline">{letter.company}</Badge>
+                  </div>
+                  <div className="whitespace-pre-wrap rounded-md bg-muted/50 p-4 text-sm max-h-96 overflow-y-auto">
+                    {letter.content}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {letters.length === 0 ? (
         <Card>
@@ -61,6 +112,12 @@ export default function CoverLettersPage() {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(letter.id)}
+                      onChange={() => toggleSelect(letter.id)}
+                      className="mt-1 h-4 w-4"
+                    />
                     <FileText className="mt-1 h-5 w-5 text-muted-foreground" />
                     <div>
                       <h3 className="font-semibold">{letter.jobTitle}</h3>
@@ -84,11 +141,29 @@ export default function CoverLettersPage() {
                       </div>
                     </div>
                   </div>
-                  <Link href={`/dashboard/jobs/${letter.jobId}`}>
-                    <Button size="sm" variant="ghost">
-                      View job
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDownload(letter.id, "pdf")}
+                      disabled={downloading?.id === letter.id && downloading.format === "pdf"}
+                    >
+                      <Download className="h-4 w-4" />
                     </Button>
-                  </Link>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDownload(letter.id, "docx")}
+                      disabled={downloading?.id === letter.id && downloading.format === "docx"}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Link href={`/dashboard/jobs/${letter.jobId}`}>
+                      <Button size="sm" variant="ghost">
+                        View job
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
                 <div className="mt-4 whitespace-pre-wrap rounded-md bg-muted/50 p-4 text-sm max-h-48 overflow-y-auto">
                   {letter.content}

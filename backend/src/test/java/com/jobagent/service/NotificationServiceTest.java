@@ -7,6 +7,7 @@ import com.jobagent.exception.ResourceNotFoundException;
 import com.jobagent.model.Notification;
 import com.jobagent.model.User;
 import com.jobagent.repository.NotificationRepository;
+import com.jobagent.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,6 +33,12 @@ class NotificationServiceTest {
 
     @Mock
     private NotificationRepository notificationRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private NotificationService notificationService;
@@ -61,6 +68,7 @@ class NotificationServiceTest {
     @Test
     void createNotification_savesSuccessfully() {
         when(notificationRepository.save(any(Notification.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(emailService.isEmailEnabled()).thenReturn(false);
 
         notificationService.createNotification(userId, "follow_up_due", "Follow-up Due",
                 "Time to follow up", null, null);

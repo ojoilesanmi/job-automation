@@ -11,9 +11,14 @@ import com.jobagent.repository.RoleRepository;
 import com.jobagent.repository.UserProfileRepository;
 import com.jobagent.repository.UserRepository;
 import com.jobagent.security.JwtTokenProvider;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,11 +26,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -37,6 +46,10 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final MeterRegistry meterRegistry;
+    private final ObjectMapper objectMapper;
+
+    @Value("${app.google.client-id:}")
+    private String googleClientId;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -93,6 +106,82 @@ public class AuthService {
                     .register(meterRegistry)
                     .increment();
             throw ex;
+        }
+    }
+
+    @Transactional
+    public AuthResponse loginWithGoogle(String code) {
+        try {
+            JsonNode tokenResponse = WebClient.create("https://oauth2.googleapis.com")
+                    .post()
+                    .uri("/token")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .bodyValue("code=" + code
+                            + "&client_id=" + googleClientId
+                            + "&grant_type=authorization_code")
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block();
+
+            if (tokenResponse == null || !tokenResponse.has("id_token")) {
+                throw new IllegalArgumentException("Google authentication failed");
+            }
+
+            String idToken = tokenResponse.get("id_token").asText();
+            JsonNode payload = parseJwtPayload(idToken);
+
+            String email = payload.get("email").asText();
+            String name = payload.has("name") ? payload.get("name").asText() : email;
+            String[] nameParts = name.split(" ", 2);
+            String firstName = nameParts[0];
+            String lastName = nameParts.length > 1 ? nameParts[1] : "";
+
+            User user = userRepository.findByEmail(email).orElseGet(() -> {
+                Role userRole = roleRepository.findByName("USER")
+                        .orElseThrow(() -> new ResourceNotFoundException("Default role not found"));
+                User newUser = User.builder()
+                        .fullName(name)
+                        .email(email)
+                        .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+                        .roles(Set.of(userRole))
+                        .build();
+                User saved = userRepository.save(newUser);
+                UserProfile profile = UserProfile.builder().user(saved).build();
+                userProfileRepository.save(profile);
+                return saved;
+            });
+
+            Counter.builder("jobagent.auth.google_logins")
+                    .description("Number of Google OAuth logins")
+                    .register(meterRegistry)
+                    .increment();
+
+            List<String> roleNames = user.getRoles().stream().map(Role::getName).collect(Collectors.toList());
+            Authentication auth = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, null));
+            String token = jwtTokenProvider.generateToken(auth);
+
+            return new AuthResponse(token, user.getId().toString(), user.getEmail(), firstName, lastName, roleNames, jwtTokenProvider.getExpirationMs());
+        } catch (Exception e) {
+            log.error("Google OAuth login failed: {}", e.getMessage());
+            throw new RuntimeException("Google authentication failed: " + e.getMessage(), e);
+        }
+    }
+
+    public UUID getUserIdByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email))
+                .getId();
+    }
+
+    private JsonNode parseJwtPayload(String idToken) {
+        try {
+            String[] parts = idToken.split("\\.");
+            if (parts.length < 2) throw new IllegalArgumentException("Invalid ID token");
+            String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+            return objectMapper.readTree(payload);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse Google ID token", e);
         }
     }
 

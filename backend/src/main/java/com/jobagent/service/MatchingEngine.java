@@ -39,6 +39,8 @@ public class MatchingEngine {
     private final ProfileService profileService;
     private final MeterRegistry meterRegistry;
     private final QueueProducerService queueProducerService;
+    private final EmbeddingService embeddingService;
+    private final LearningLoopService learningLoopService;
 
     @Transactional
     public JobMatchResponse scoreJob(UUID userId, UUID jobId) {
@@ -61,6 +63,7 @@ public class MatchingEngine {
         Map<String, BigDecimal> scores = computeScoresWithAiOrFallback(userSkills, experiences, prefs, job);
 
         BigDecimal fitScore = scores.get("fit");
+        fitScore = applyLearningLoopAdjustment(userId, job.getCompany(), fitScore);
         BigDecimal skillsScore = scores.get("skills");
         BigDecimal experienceScore = scores.get("experience");
         BigDecimal roleScore = scores.get("role");
@@ -186,12 +189,15 @@ public class MatchingEngine {
         BigDecimal salaryScore = calculateSalaryScore(job, prefs);
         BigDecimal domainScore = calculateDomainScore(job, prefs);
 
-        BigDecimal fitScore = skillsScore.multiply(new BigDecimal("0.35"))
+        BigDecimal embeddingScore = calculateEmbeddingScore(userSkills, experiences, job);
+
+        BigDecimal fitScore = skillsScore.multiply(new BigDecimal("0.30"))
                 .add(experienceScore.multiply(new BigDecimal("0.20")))
                 .add(roleScore.multiply(new BigDecimal("0.15")))
                 .add(locationScore.multiply(new BigDecimal("0.15")))
                 .add(salaryScore.multiply(new BigDecimal("0.10")))
                 .add(domainScore.multiply(new BigDecimal("0.05")))
+                .add(embeddingScore.multiply(new BigDecimal("0.10")))
                 .setScale(2, RoundingMode.HALF_UP);
 
         return Map.of(
@@ -201,8 +207,31 @@ public class MatchingEngine {
                 "role", roleScore,
                 "location", locationScore,
                 "salary", salaryScore,
-                "domain", domainScore
+                "domain", domainScore,
+                "embedding", embeddingScore
         );
+    }
+
+    private BigDecimal calculateEmbeddingScore(List<ProfileSkill> userSkills,
+                                               List<WorkExperience> experiences, Job job) {
+        if (!embeddingService.isEnabled()) {
+            return new BigDecimal("70.00");
+        }
+
+        try {
+            String skillText = userSkills.stream().map(ProfileSkill::getSkillName).collect(Collectors.joining(" "));
+            String expText = experiences.stream().limit(5)
+                    .map(e -> e.getTitle() + " " + e.getCompany() + " " + (e.getDescription() != null ? e.getDescription() : ""))
+                    .collect(Collectors.joining(" "));
+            float[] profileEmbedding = embeddingService.getProfileEmbedding("", skillText, expText);
+            float[] jobEmbedding = embeddingService.getJobEmbedding(job.getTitle(), job.getDescription(), job.getRequiredSkills());
+            double similarity = embeddingService.cosineSimilarity(profileEmbedding, jobEmbedding);
+            double score = Math.min(100, similarity * 100);
+            return BigDecimal.valueOf(score).setScale(2, RoundingMode.HALF_UP);
+        } catch (Exception e) {
+            log.debug("Embedding score calculation failed: {}", e.getMessage());
+            return new BigDecimal("70.00");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -287,6 +316,27 @@ public class MatchingEngine {
         if (!match.getUser().getId().equals(userId)) {
             throw new ForbiddenException("You do not have access to this match");
         }
+    }
+
+    private BigDecimal applyLearningLoopAdjustment(UUID userId, String company, BigDecimal fitScore) {
+        if (company == null) return fitScore;
+        try {
+            Map<String, Long> counts = learningLoopService.getCompanyFeedbackCounts(userId, company);
+            long rejected = counts.getOrDefault("rejected", 0L);
+            long approved = counts.getOrDefault("approved", 0L);
+
+            if (rejected > approved) {
+                return fitScore.multiply(new BigDecimal("0.95"))
+                        .setScale(2, RoundingMode.HALF_UP);
+            }
+            if (approved > rejected) {
+                return fitScore.multiply(new BigDecimal("1.03"))
+                        .setScale(2, RoundingMode.HALF_UP);
+            }
+        } catch (Exception e) {
+            log.debug("Learning loop adjustment skipped for company {}: {}", company, e.getMessage());
+        }
+        return fitScore;
     }
 
     private BigDecimal calculateSkillsScore(Set<String> userSkills, List<String> required, List<String> preferred) {

@@ -4,6 +4,7 @@ import com.jobagent.dto.*;
 import com.jobagent.security.RequirePermission;
 import com.jobagent.security.SecurityUtils;
 import com.jobagent.service.CoverLetterService;
+import com.jobagent.service.DocxExportService;
 import com.jobagent.service.PdfExportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -22,6 +23,7 @@ public class CoverLetterController {
 
     private final CoverLetterService coverLetterService;
     private final PdfExportService pdfExportService;
+    private final DocxExportService docxExportService;
 
     @PostMapping("/jobs/{jobId}/cover-letters/generate")
     @RequirePermission("cover_letter:write")
@@ -82,6 +84,14 @@ public class CoverLetterController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cover-letter-" + id + ".pdf\"")
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(pdfBytes);
+        }
+
+        if ("docx".equals(format)) {
+            byte[] docxBytes = docxExportService.generateDocx(content, "Cover Letter");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"cover-letter-" + id + ".docx\"")
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                    .body(docxBytes);
         }
 
         byte[] textBytes = content.getBytes();

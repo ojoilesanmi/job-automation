@@ -35,6 +35,8 @@ class MatchingEngineTest {
     @Mock private ApplicationService applicationService;
     @Mock private ProfileService profileService;
     @Mock private QueueProducerService queueProducerService;
+    @Mock private EmbeddingService embeddingService;
+    @Mock private LearningLoopService learningLoopService;
 
     private MeterRegistry meterRegistry;
 
@@ -47,7 +49,8 @@ class MatchingEngineTest {
         matchingEngine = new MatchingEngine(
                 jobMatchRepository, jobRepository, skillRepository, experienceRepository,
                 preferencesRepository, aiServiceClient, coverLetterService,
-                applicationService, profileService, meterRegistry, queueProducerService);
+                applicationService, profileService, meterRegistry, queueProducerService,
+                embeddingService, learningLoopService);
     }
 
     @Test

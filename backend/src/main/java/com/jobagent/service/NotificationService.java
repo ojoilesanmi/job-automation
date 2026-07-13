@@ -5,6 +5,7 @@ import com.jobagent.dto.NotificationResponse;
 import com.jobagent.model.Notification;
 import com.jobagent.model.User;
 import com.jobagent.repository.NotificationRepository;
+import com.jobagent.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final UserRepository userRepository;
+    private final EmailService emailService;
 
     @Transactional
     public void createNotification(UUID userId, String type, String title, String message,
@@ -37,6 +41,13 @@ public class NotificationService {
                 .read(false)
                 .build();
         notificationRepository.save(notification);
+
+        if (!EMAIL_EXCLUDED_TYPES.contains(type) && emailService.isEmailEnabled()) {
+            userRepository.findById(userId).ifPresent(u -> {
+                String htmlBody = buildNotificationHtml(title, message, type);
+                emailService.sendNotificationEmail(u.getEmail(), title, htmlBody);
+            });
+        }
     }
 
     @Transactional(readOnly = true)
@@ -79,5 +90,22 @@ public class NotificationService {
                 n.getId(), n.getType(), n.getTitle(), n.getMessage(),
                 n.getReferenceId(), n.getReferenceType(), n.isRead(), n.getCreatedAt()
         );
+    }
+
+    private static final Set<String> EMAIL_EXCLUDED_TYPES = Set.of(
+            "daily_summary", "match_scored", "weekly_summary"
+    );
+
+    private String buildNotificationHtml(String title, String message, String type) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <h2 style="color: #2563eb;">%s</h2>
+                    <p>%s</p>
+                    <p style="color: #666; font-size: 14px;">Notification type: %s</p>
+                </body>
+                </html>
+                """.formatted(title, message, type);
     }
 }

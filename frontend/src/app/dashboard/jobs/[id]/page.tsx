@@ -4,52 +4,18 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { parseSkills } from "@/lib/utils";
+import type { JobDetail, JobMatchDetail, CompanyResearch } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, MapPin, DollarSign, ExternalLink, Zap, AlertTriangle, CheckCircle, XCircle, FileText, Clock } from "lucide-react";
-
-interface Job {
-  id: string;
-  title: string;
-  company: string;
-  description: string;
-  location: string;
-  country: string;
-  salaryMin: number;
-  salaryMax: number;
-  currency: string;
-  remoteType: string;
-  seniority: string;
-  requiredSkills: string;
-  preferredSkills: string;
-  experienceYears: number;
-  employmentType: string;
-  applicationUrl: string;
-}
-
-interface Match {
-  id: string;
-  jobId: string;
-  fitScore: number;
-  skillsScore: number;
-  experienceScore: number;
-  roleScore: number;
-  locationScore: number;
-  matchedSkills: string;
-  missingSkills: string;
-  reasonsToApply: string;
-  reasonsToSkip: string;
-  riskFlags: string;
-  status: string;
-}
+import { ArrowLeft, MapPin, DollarSign, ExternalLink, Zap, AlertTriangle, CheckCircle, XCircle, FileText, Clock, ChevronDown, ChevronRight, Building2 } from "lucide-react";
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [job, setJob] = useState<Job | null>(null);
-  const [match, setMatch] = useState<Match | null>(null);
+  const [job, setJob] = useState<JobDetail | null>(null);
+  const [match, setMatch] = useState<JobMatchDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [matching, setMatching] = useState(false);
   const [tone, setTone] = useState("professional");
@@ -57,11 +23,14 @@ export default function JobDetailPage() {
   const [generatingCL, setGeneratingCL] = useState(false);
   const [followUpDate, setFollowUpDate] = useState("");
   const [schedulingFollowUp, setSchedulingFollowUp] = useState(false);
+  const [companyResearch, setCompanyResearch] = useState<CompanyResearch | null>(null);
+  const [researching, setResearching] = useState(false);
+  const [showResearch, setShowResearch] = useState(false);
 
   useEffect(() => {
     Promise.all([
-      api.get<Job>(`/api/v1/jobs/${id}`).catch(() => null),
-      api.get<{ matches: Match[] }>(`/api/v1/matches`).catch(() => ({ matches: [] })),
+      api.get<JobDetail>(`/api/v1/jobs/${id}`).catch(() => null),
+      api.get<{ matches: JobMatchDetail[] }>(`/api/v1/matches`).catch(() => ({ matches: [] })),
     ]).then(([jobData, matchData]) => {
       setJob(jobData);
       const existing = matchData?.matches?.find((m) => m.jobId === id);
@@ -72,7 +41,7 @@ export default function JobDetailPage() {
   const runMatch = async () => {
     setMatching(true);
     try {
-      const result = await api.post<Match>("/api/v1/matches", { jobId: id });
+      const result = await api.post<JobMatchDetail>("/api/v1/matches", { jobId: id });
       setMatch(result);
     } catch {}
     setMatching(false);
@@ -97,6 +66,20 @@ export default function JobDetailPage() {
       });
     } catch {}
     setSchedulingFollowUp(false);
+  };
+
+  const researchCompany = async () => {
+    if (!job) return;
+    setResearching(true);
+    try {
+      const data = await api.post<CompanyResearch>("/api/v1/company/research", {
+        companyName: job.company,
+        description: job.description,
+      });
+      setCompanyResearch(data);
+      setShowResearch(true);
+    } catch {}
+    setResearching(false);
   };
 
   if (loading || !job) {
@@ -124,7 +107,18 @@ export default function JobDetailPage() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div>
-                  <h2 className="text-xl font-semibold">{job.company}</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-semibold">{job.company}</h2>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={researchCompany}
+                      disabled={researching}
+                    >
+                      <Building2 className="mr-1 h-4 w-4" />
+                      {researching ? "Researching..." : "Research Company"}
+                    </Button>
+                  </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
                     {job.location && <span className="flex items-center gap-1"><MapPin className="h-4 w-4" />{job.location}</span>}
                     {(job.salaryMin || job.salaryMax) && (
@@ -148,6 +142,46 @@ export default function JobDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {companyResearch && (
+            <Card>
+              <button
+                onClick={() => setShowResearch(!showResearch)}
+                className="flex w-full items-center justify-between p-6 text-left"
+              >
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Company Research
+                </CardTitle>
+                {showResearch ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              </button>
+              {showResearch && (
+                <CardContent className="pt-0 space-y-4">
+                  <p className="text-sm text-muted-foreground">{companyResearch.summary}</p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Industry</p>
+                      <p className="text-sm">{companyResearch.industry}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Company Size</p>
+                      <p className="text-sm">{companyResearch.companySize}</p>
+                    </div>
+                  </div>
+                  {companyResearch.techStack && companyResearch.techStack !== "Unknown" && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Tech Stack</p>
+                      <div className="flex flex-wrap gap-2">
+                        {companyResearch.techStack.split(",").map((tech) => (
+                          <Badge key={tech.trim()} variant="secondary" className="text-xs">{tech.trim()}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          )}
 
           {match && (
             <Card>

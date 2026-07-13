@@ -56,4 +56,14 @@ public class LearningLoopService {
                 "approvalRate", Math.round(approvalRate * 100.0) / 100.0
         );
     }
+
+    @Transactional(readOnly = true)
+    public Map<String, Long> getCompanyFeedbackCounts(UUID userId, String company) {
+        List<Object[]> rows = feedbackRepository.countByFeedbackTypeAndCompany(userId, company);
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (Object[] row : rows) {
+            counts.put((String) row[0], (Long) row[1]);
+        }
+        return counts;
+    }
 }

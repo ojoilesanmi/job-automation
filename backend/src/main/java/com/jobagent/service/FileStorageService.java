@@ -7,12 +7,16 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
+import java.time.Duration;
 import java.util.UUID;
 
 @Slf4j
@@ -41,6 +45,7 @@ public class FileStorageService {
     private String s3SecretKey;
 
     private S3Client s3Client;
+    private S3Presigner s3Presigner;
 
     @PostConstruct
     public void init() {
@@ -54,6 +59,13 @@ public class FileStorageService {
                     builder.endpointOverride(URI.create(s3Endpoint));
                 }
                 s3Client = builder.build();
+                var presignerBuilder = S3Presigner.builder()
+                        .region(Region.of(s3Region))
+                        .credentialsProvider(StaticCredentialsProvider.create(credentials));
+                if (s3Endpoint != null && !s3Endpoint.isBlank()) {
+                    presignerBuilder.endpointOverride(URI.create(s3Endpoint));
+                }
+                s3Presigner = presignerBuilder.build();
                 log.info("S3 storage initialized for bucket: {}", s3Bucket);
             } catch (Exception e) {
                 log.error("Failed to initialize S3 client: {}. Falling back to local.", e.getMessage());
@@ -134,5 +146,23 @@ public class FileStorageService {
 
     public String getStorageType() {
         return storageType;
+    }
+
+    public String generateSignedUrl(String fileUrl, Duration expiry) {
+        if (fileUrl.startsWith("s3://")) {
+            String[] parts = fileUrl.replace("s3://", "").split("/", 2);
+            String bucket = parts[0];
+            String key = parts[1];
+            GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(key)
+                    .build();
+            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(expiry)
+                    .getObjectRequest(getObjectRequest)
+                    .build();
+            return s3Presigner.presignGetObject(presignRequest).url().toString();
+        }
+        return "/api/v1/files/" + java.net.URLEncoder.encode(fileUrl, java.nio.charset.StandardCharsets.UTF_8);
     }
 }

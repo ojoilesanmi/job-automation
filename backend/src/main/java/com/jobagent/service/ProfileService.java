@@ -4,18 +4,13 @@ import com.jobagent.dto.*;
 import com.jobagent.exception.ResourceNotFoundException;
 import com.jobagent.model.*;
 import com.jobagent.repository.*;
-import com.jobagent.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,14 +22,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ProfileService {
 
-    @Value("${app.upload.dir:uploads/cvs}")
-    private String uploadDir;
-
     private final UserProfileRepository profileRepository;
     private final CvDocumentRepository cvDocumentRepository;
     private final ProfileSkillRepository skillRepository;
     private final WorkExperienceRepository experienceRepository;
     private final ProjectRepository projectRepository;
+    private final FileStorageService fileStorageService;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(UUID userId) {
@@ -182,23 +175,17 @@ public class ProfileService {
             originalFilename = "untitled_cv";
         }
 
-        String extension = "";
-        int dotIndex = originalFilename.lastIndexOf('.');
-        if (dotIndex > 0) {
-            extension = originalFilename.substring(dotIndex);
-        }
-        String storedFilename = UUID.randomUUID() + extension;
-
-        Path uploadPath = Paths.get(uploadDir, userId.toString());
+        String fileUrl;
         try {
-            Files.createDirectories(uploadPath);
-            Path filePath = uploadPath.resolve(storedFilename);
-            Files.copy(file.getInputStream(), filePath);
+            String contentType = file.getContentType();
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+            fileUrl = fileStorageService.store("cvs/" + userId, originalFilename, file.getBytes(), contentType);
         } catch (IOException e) {
-            throw new RuntimeException("Failed to save CV file: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to read CV file: " + e.getMessage(), e);
         }
 
-        String fileUrl = "/uploads/cvs/" + userId + "/" + storedFilename;
         boolean hasExistingCvs = !cvDocumentRepository.findByUserIdOrderByIsDefaultDescCreatedAtDesc(userId).isEmpty();
 
         CvDocument cv = CvDocument.builder()
