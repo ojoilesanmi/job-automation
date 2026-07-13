@@ -111,6 +111,7 @@ jobs:
             -DsuppressionFile=owasp-suppression.xml \
             -DdataDirectory=$HOME/.dependency-check \
             -DnvdApiKey=$NVD_API_KEY \
+            -DossindexAnalyzerEnabled=false \
             -DfailBuildOnCVSS=7 \
             -DskipTestScope=true
 
