@@ -138,3 +138,99 @@ export interface PaginatedResponse<T> {
   page: number;
   size: number;
 }
+
+export interface JobDetail {
+  id: string;
+  title: string;
+  company: string;
+  description: string;
+  location: string;
+  country: string;
+  salaryMin: number;
+  salaryMax: number;
+  currency: string;
+  remoteType: string;
+  seniority: string;
+  requiredSkills: string;
+  preferredSkills: string;
+  experienceYears: number;
+  employmentType: string;
+  applicationUrl: string;
+}
+
+export interface JobMatchDetail {
+  id: string;
+  jobId: string;
+  fitScore: number;
+  skillsScore: number;
+  experienceScore: number;
+  roleScore: number;
+  locationScore: number;
+  matchedSkills: string;
+  missingSkills: string;
+  reasonsToApply: string;
+  reasonsToSkip: string;
+  riskFlags: string;
+  status: string;
+}
+
+export interface CoverLetterResponse {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  content: string;
+  version: number;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CoverLetterListResponse {
+  coverLetters: CoverLetterResponse[];
+}
+
+export interface CoverLetterTemplate {
+  id: string;
+  name: string;
+  content: string;
+  tone: string;
+  targetRole: string;
+  createdAt: string;
+}
+
+export interface SkillGap {
+  skill: string;
+  severity: string;
+  recommendation: string;
+}
+
+export interface ExperienceGap {
+  area: string;
+  description: string;
+  suggestion: string;
+}
+
+export interface GapAnalysis {
+  missingSkills: SkillGap[];
+  experienceGaps: ExperienceGap[];
+  summary: string;
+}
+
+export interface DetectedQuestion {
+  id: string;
+  text: string;
+  type: string;
+  required: boolean;
+  answered: boolean;
+}
+
+export interface CompanyResearch {
+  companyName: string;
+  summary: string;
+  companySize: string;
+  industry: string;
+  techStack: string;
+  glassdoorRating: string;
+  linkedInUrl: string;
+}
